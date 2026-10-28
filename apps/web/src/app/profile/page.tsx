@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { SignOutButton } from "@/components/sign-out-button";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
 import { ProfileForm } from "./profile-form";
@@ -19,6 +20,9 @@ export default async function ProfilePage() {
       </p>
       <div className="mt-6">
         <ProfileForm initial={{ name: me.name, bio: me.bio }} />
+      </div>
+      <div className="mt-10 border-t border-line pt-6">
+        <SignOutButton />
       </div>
     </div>
   );

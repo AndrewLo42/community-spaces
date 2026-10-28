@@ -2,6 +2,7 @@ import type { Db } from "@cs/db";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod";
+import type { Storage } from "./storage";
 
 export interface SessionUser {
   id: string;
@@ -13,6 +14,7 @@ export interface SessionUser {
 /** Built per request by the host app (Next.js today, the same server for mobile later). */
 export interface Context {
   db: Db;
+  storage: Storage;
   user: SessionUser | null;
 }
 

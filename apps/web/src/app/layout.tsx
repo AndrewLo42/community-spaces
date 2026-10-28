@@ -20,7 +20,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers>
           <header className="border-b border-line bg-surface">
             <nav className="mx-auto flex max-w-5xl items-center gap-1 px-4 py-3">
-              <Link href="/" className="mr-4 font-serif text-lg font-semibold tracking-tight">
+              <Link href="/" className="mr-2 whitespace-nowrap font-serif text-lg font-semibold tracking-tight sm:mr-4">
                 Community Spaces
               </Link>
               <ButtonLink href="/discover" variant="ghost">
@@ -29,13 +29,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="ml-auto flex items-center gap-1">
                 {user ? (
                   <>
-                    <ButtonLink href="/groups/new" variant="ghost">
-                      New group
-                    </ButtonLink>
-                    <ButtonLink href="/profile" variant="ghost">
+                    <span className="hidden sm:contents">
+                      <ButtonLink href="/groups/new" variant="ghost">
+                        New group
+                      </ButtonLink>
+                    </span>
+                    <ButtonLink href="/profile" variant="ghost" className="max-w-40 truncate">
                       {user.name || "Profile"}
                     </ButtonLink>
-                    <SignOutButton />
+                    <span className="hidden sm:contents">
+                      <SignOutButton />
+                    </span>
                   </>
                 ) : (
                   <ButtonLink href="/sign-in">Sign in</ButtonLink>

@@ -2,7 +2,9 @@ import { CATEGORY_LABELS, type GroupCategory } from "@cs/core";
 import { TRPCError } from "@trpc/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Card, EmptyState } from "@/components/ui";
+import { PostCard } from "@/components/post-card";
+import { PostComposer } from "@/components/post-composer";
+import { ButtonLink, Card, EmptyState } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
 import { MembershipButton } from "./membership-button";
@@ -24,14 +26,72 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: group.name, description: group.description };
 }
 
+async function GroupFeed({
+  groupId,
+  slug,
+  cursor,
+  canPost,
+  needsApproval,
+}: {
+  groupId: string;
+  slug: string;
+  cursor?: string;
+  canPost: boolean;
+  needsApproval: boolean;
+}) {
+  const api = await serverApi();
+  const feed = await api.post.groupFeed({ groupId, cursor });
+  const isEmpty = feed.posts.length === 0 && feed.pinned.length === 0 && feed.pending.length === 0;
+
+  return (
+    <>
+      {canPost && !cursor ? <PostComposer groupId={groupId} needsApproval={needsApproval} /> : null}
+
+      {feed.pending.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted">Waiting for approval</h2>
+          {feed.pending.map((p) => (
+            <PostCard key={p.id} post={p} />
+          ))}
+        </div>
+      ) : null}
+
+      {[...feed.pinned, ...feed.posts].map((p) => (
+        <PostCard key={p.id} post={p} />
+      ))}
+
+      {isEmpty ? (
+        <EmptyState title={cursor ? "No older posts" : "No posts yet"}>
+          {canPost && !cursor ? "Start the conversation." : null}
+        </EmptyState>
+      ) : null}
+
+      {feed.nextCursor ? (
+        <div className="text-center">
+          <ButtonLink href={`/g/${slug}?cursor=${encodeURIComponent(feed.nextCursor)}`} variant="secondary">
+            Older posts
+          </ButtonLink>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 const postPolicyCopy = {
   members: "All members can post.",
   approval: "Member posts are reviewed by moderators before they appear.",
   admins: "Only admins post here. Members can comment.",
 } as const;
 
-export default async function GroupPage({ params }: { params: Params }) {
+export default async function GroupPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<{ cursor?: string }>;
+}) {
   const { slug } = await params;
+  const { cursor } = await searchParams;
   const [{ group, membership, permissions }, user] = await Promise.all([loadGroup(slug), getSessionUser()]);
 
   return (
@@ -64,9 +124,13 @@ export default async function GroupPage({ params }: { params: Params }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
         <section className="space-y-4">
           {permissions.read ? (
-            <EmptyState title="No posts yet">
-              {permissions.post ? "Posting arrives in the next build step." : "Posts from this group will appear here."}
-            </EmptyState>
+            <GroupFeed
+              groupId={group.id}
+              slug={group.slug}
+              cursor={cursor}
+              canPost={permissions.post}
+              needsApproval={!permissions.postWithoutApproval}
+            />
           ) : (
             <EmptyState title="This group is private">
               {membership?.status === "pending"

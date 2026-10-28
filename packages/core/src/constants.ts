@@ -81,3 +81,8 @@ export const GROUP_ACCENTS = [
 ] as const;
 
 export const MAX_POST_IMAGES = 4;
+/** Images are resized in the browser before upload; this is the hard cap. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_DIMENSION = 2000;
+export const IMAGE_CONTENT_TYPES = ["image/webp", "image/jpeg", "image/png"] as const;
+export type ImageContentType = (typeof IMAGE_CONTENT_TYPES)[number];

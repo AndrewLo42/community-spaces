@@ -4,11 +4,11 @@ import {
   discoverGroupsInput,
   groupPermissions,
   joinGroupInput,
-  type PermissionContext,
 } from "@cs/core";
-import { and, desc, eq, groups, ilike, memberships, ne, or, sql, type Db } from "@cs/db";
+import { and, desc, eq, groups, ilike, memberships, ne, or, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { loadGroupAccess } from "../lib/access";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 20;
@@ -23,25 +23,6 @@ const groupCard = {
   visibility: groups.visibility,
   memberCount: groups.memberCount,
 };
-
-/** Loads a group plus the viewer's membership, ready for `can()`. */
-async function loadGroup(db: Db, where: { id: string } | { slug: string }, userId: string | null) {
-  const [group] = await db
-    .select()
-    .from(groups)
-    .where("id" in where ? eq(groups.id, where.id) : eq(groups.slug, where.slug));
-  if (!group) return null;
-
-  const [membership] = userId
-    ? await db
-        .select({ role: memberships.role, status: memberships.status })
-        .from(memberships)
-        .where(and(eq(memberships.groupId, group.id), eq(memberships.userId, userId)))
-    : [];
-
-  const permissionContext: PermissionContext = { userId, group, membership: membership ?? null };
-  return { group, membership: membership ?? null, permissionContext };
-}
 
 export const groupRouter = router({
   discover: publicProcedure.input(discoverGroupsInput).query(async ({ ctx, input }) => {
@@ -81,7 +62,7 @@ export const groupRouter = router({
   }),
 
   bySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ ctx, input }) => {
-    const loaded = await loadGroup(ctx.db, { slug: input.slug }, ctx.user?.id ?? null);
+    const loaded = await loadGroupAccess(ctx.db, { slug: input.slug }, ctx.user?.id ?? null);
     // Hidden groups look exactly like missing ones to outsiders.
     if (!loaded || !can(loaded.permissionContext, "group:discover")) {
       throw new TRPCError({ code: "NOT_FOUND" });
@@ -111,7 +92,7 @@ export const groupRouter = router({
   }),
 
   join: protectedProcedure.input(joinGroupInput).mutation(async ({ ctx, input }) => {
-    const loaded = await loadGroup(ctx.db, { id: input.groupId }, ctx.user.id);
+    const loaded = await loadGroupAccess(ctx.db, { id: input.groupId }, ctx.user.id);
     if (!loaded || !can(loaded.permissionContext, "group:discover")) {
       throw new TRPCError({ code: "NOT_FOUND" });
     }
@@ -141,7 +122,7 @@ export const groupRouter = router({
   }),
 
   leave: protectedProcedure.input(z.object({ groupId: z.string() })).mutation(async ({ ctx, input }) => {
-    const loaded = await loadGroup(ctx.db, { id: input.groupId }, ctx.user.id);
+    const loaded = await loadGroupAccess(ctx.db, { id: input.groupId }, ctx.user.id);
     const isPendingRequest = loaded?.membership?.status === "pending";
     if (!loaded || (!can(loaded.permissionContext, "group:leave") && !isPendingRequest)) {
       throw new TRPCError({ code: "FORBIDDEN" });

@@ -9,6 +9,8 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1158.0",
+    "@aws-sdk/s3-request-presigner": "^3.1158.0",
     "@cs/api": "workspace:*",
     "@cs/core": "workspace:*",
     "@cs/db": "workspace:*",

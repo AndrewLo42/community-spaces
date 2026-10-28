@@ -1,7 +1,7 @@
 import { GROUP_ACCENTS, type GroupCategory } from "@cs/core";
 import { eq } from "drizzle-orm";
 import { connect } from "./client";
-import { groups, memberships, users } from "./schema";
+import { comments, groups, memberships, posts, users } from "./schema";
 
 // Sample local communities so Discover isn't empty in dev. Safe to re-run.
 
@@ -94,6 +94,78 @@ for (const [i, g] of sampleGroups.entries()) {
     await db.insert(memberships).values({ groupId: created.id, userId: ownerId, role: "owner" });
     console.log(`  + ${g.name}`);
   }
+}
+
+// Sample conversation, added once per group (skipped if the group has posts).
+const samplePosts: Record<string, Array<{ author: string; body: string; pinned?: boolean; comments?: Array<[string, string]> }>> = {
+  "riverside-community-garden": [
+    {
+      author: "maria@example.com",
+      pinned: true,
+      body: "Welcome! Work days are the first Saturday of every month, 9–12. Gloves and tools are in the shed (code is on the board by the gate).",
+    },
+    {
+      author: "june@example.com",
+      body: "Anyone have extra tomato starts? Mine didn't survive the cold snap.",
+      comments: [
+        ["maria@example.com", "I have about six Sungolds left. Leaving them by the shed tomorrow morning."],
+        ["june@example.com", "Thank you! Grabbing two if that's alright."],
+      ],
+    },
+    {
+      author: "dev@example.com",
+      body: "Reminder that the compost bins are for plant matter only. Found a pizza box in bin 2 again 🙃",
+    },
+  ],
+  "eastside-running-club": [
+    {
+      author: "dev@example.com",
+      pinned: true,
+      body: "Saturday route: boathouse → river path → Elm St bridge and back. 5k, with a 3k turnaround for anyone easing in.",
+      comments: [["june@example.com", "Is the river path still muddy after last week's rain?"]],
+    },
+  ],
+  "maple-street-neighbors": [
+    {
+      author: "maria@example.com",
+      body: "Street sweeping is moving to Thursdays starting next month. Please move cars from the even side by 8am.",
+      comments: [["june@example.com", "Thanks for the heads up. Is this permanent?"]],
+    },
+  ],
+};
+
+for (const [slug, postsForGroup] of Object.entries(samplePosts)) {
+  const [group] = await db.select({ id: groups.id }).from(groups).where(eq(groups.slug, slug));
+  if (!group) continue;
+  const [existing] = await db.select({ id: posts.id }).from(posts).where(eq(posts.groupId, group.id)).limit(1);
+  if (existing) continue;
+
+  // Space posts out over the past few days so the feed reads naturally.
+  let hoursAgo = 4 + postsForGroup.length * 20;
+  for (const p of postsForGroup) {
+    const createdAt = new Date(Date.now() - hoursAgo * 3_600_000);
+    hoursAgo -= 20;
+    const [post] = await db
+      .insert(posts)
+      .values({
+        groupId: group.id,
+        authorId: userIds.get(p.author)!,
+        body: p.body,
+        pinned: p.pinned ?? false,
+        commentCount: p.comments?.length ?? 0,
+        createdAt,
+      })
+      .returning({ id: posts.id });
+    for (const [i, [author, body]] of (p.comments ?? []).entries()) {
+      await db.insert(comments).values({
+        postId: post!.id,
+        authorId: userIds.get(author)!,
+        body,
+        createdAt: new Date(createdAt.getTime() + (i + 1) * 45 * 60_000),
+      });
+    }
+  }
+  console.log(`  + posts in ${slug}`);
 }
 
 await close();

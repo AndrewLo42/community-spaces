@@ -185,7 +185,9 @@ export const posts = pgTable(
     locked: boolean("locked").notNull().default(false),
     commentCount: integer("comment_count").notNull().default(0),
     editedAt: timestamp("edited_at", { withTimezone: true }),
-    ...timestamps,
+    // Millisecond precision so a JS Date round-trips exactly as a feed cursor.
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamps.updatedAt,
   },
   (t) => [
     // Keyset pagination for a group feed: WHERE group_id = ? AND status = 'published'

@@ -6,6 +6,7 @@ import {
   canChangeRole,
   canCommentOnPost,
   canRemoveContent,
+  canViewPost,
   type GroupRules,
   type PermissionContext,
 } from "./permissions";
@@ -132,6 +133,32 @@ describe("commenting", () => {
     const locked = { locked: true };
     assert.equal(canCommentOnPost(ctx({}, { role: "member" }), locked), false);
     assert.equal(canCommentOnPost(ctx({}, { role: "moderator" }), locked), true);
+  });
+
+  it("pending posts can't be commented on, even by moderators", () => {
+    const pending = { locked: false, status: "pending" as const };
+    assert.equal(canCommentOnPost(ctx({}, { role: "moderator" }), pending), false);
+  });
+});
+
+describe("viewing posts", () => {
+  const published = { authorId: "author", status: "published" as const };
+  const pending = { authorId: "author", status: "pending" as const };
+  const removed = { authorId: "author", status: "removed" as const };
+
+  it("published posts follow the group's read rule", () => {
+    assert.equal(canViewPost(ctx({}, null, null), published), true);
+    assert.equal(canViewPost(ctx({ visibility: "private" }, null), published), false);
+  });
+
+  it("pending posts are visible to their author and moderators only", () => {
+    assert.equal(canViewPost(ctx({}, { role: "member" }, "author"), pending), true);
+    assert.equal(canViewPost(ctx({}, { role: "member" }, "someone"), pending), false);
+    assert.equal(canViewPost(ctx({}, { role: "moderator" }, "mod"), pending), true);
+  });
+
+  it("removed posts are visible to nobody", () => {
+    assert.equal(canViewPost(ctx({}, { role: "owner" }, "author"), removed), false);
   });
 });
 

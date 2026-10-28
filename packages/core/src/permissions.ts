@@ -6,6 +6,7 @@ import {
   type MemberRole,
   type MembershipStatus,
   type PostPolicy,
+  type PostStatus,
 } from "./constants";
 
 // Every permission decision in the app goes through this file, so the rules
@@ -106,8 +107,20 @@ export function can(ctx: PermissionContext, action: GroupAction): boolean {
   }
 }
 
-/** Locked posts only accept comments from moderators and up. */
-export function canCommentOnPost(ctx: PermissionContext, post: { locked: boolean }): boolean {
+/**
+ * Published posts follow the group's read rule. Pending posts are visible only
+ * to their author and moderators; removed posts to nobody.
+ */
+export function canViewPost(ctx: PermissionContext, post: { authorId: string; status: PostStatus }): boolean {
+  if (!can(ctx, "group:read")) return false;
+  if (post.status === "published") return true;
+  if (post.status === "pending") return ctx.userId === post.authorId || can(ctx, "post:moderate");
+  return false;
+}
+
+/** Comments go on published posts; locked posts only take moderator comments. */
+export function canCommentOnPost(ctx: PermissionContext, post: { locked: boolean; status?: PostStatus }): boolean {
+  if (post.status !== undefined && post.status !== "published") return false;
   if (!can(ctx, "comment:create")) return false;
   return !post.locked || isAtLeast(activeRole(ctx), "moderator");
 }
