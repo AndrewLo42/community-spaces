@@ -3,6 +3,7 @@ import Link from "next/link";
 import { timeAgo } from "@/lib/time";
 import { Avatar } from "./avatar";
 import { PostActions } from "./post-actions";
+import { PostImages } from "./post-images";
 import { Card, cx } from "./ui";
 
 export function PostCard({
@@ -61,41 +62,5 @@ export function PostCard({
         </footer>
       ) : null}
     </Card>
-  );
-}
-
-function PostImages({ images }: { images: PostView["images"] }) {
-  if (images.length === 1) {
-    const img = images[0]!;
-    return (
-      <a href={img.url} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-lg bg-surface-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={img.url}
-          alt=""
-          width={img.width ?? undefined}
-          height={img.height ?? undefined}
-          loading="lazy"
-          className="max-h-[32rem] w-full object-contain"
-        />
-      </a>
-    );
-  }
-
-  return (
-    <div className="mt-3 grid grid-cols-2 gap-1.5 overflow-hidden rounded-lg">
-      {images.map((img, i) => (
-        <a
-          key={img.url}
-          href={img.url}
-          target="_blank"
-          rel="noreferrer"
-          className={cx("block bg-surface-2", images.length === 3 && i === 0 && "row-span-2")}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img.url} alt="" loading="lazy" className="aspect-square h-full w-full object-cover" />
-        </a>
-      ))}
-    </div>
   );
 }
