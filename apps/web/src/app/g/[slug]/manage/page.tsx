@@ -10,7 +10,7 @@ import { PostCard } from "@/components/post-card";
 import { Card, cx, EmptyState } from "@/components/ui";
 import { timeAgo } from "@/lib/time";
 import { serverApi } from "@/server/api";
-import { InvitePanel, MemberActions, ReportActions, RequestActions, SettingsForm } from "./actions";
+import { DangerZone, InvitePanel, MemberActions, ReportActions, RequestActions, SettingsForm } from "./actions";
 
 export const metadata: Metadata = { title: "Manage group" };
 
@@ -102,21 +102,24 @@ export default async function ManagePage({
         {tab === "members" ? <MembersTab groupId={groupId} /> : null}
         {tab === "invites" ? <InvitesTab groupId={groupId} /> : null}
         {tab === "settings" ? (
-          <SettingsForm
-            groupId={groupId}
-            initial={{
-              name: group.name,
-              description: group.description,
-              rules: group.rules,
-              // Stored as text; written only through validated input, so these narrow safely.
-              category: group.category as GroupSettings["category"],
-              accentColor: group.accentColor as GroupSettings["accentColor"],
-              visibility: group.visibility,
-              joinPolicy: group.joinPolicy,
-              postPolicy: group.postPolicy,
-              commentPolicy: group.commentPolicy,
-            }}
-          />
+          <>
+            <SettingsForm
+              groupId={groupId}
+              initial={{
+                name: group.name,
+                description: group.description,
+                rules: group.rules,
+                // Stored as text; written only through validated input, so these narrow safely.
+                category: group.category as GroupSettings["category"],
+                accentColor: group.accentColor as GroupSettings["accentColor"],
+                visibility: group.visibility,
+                joinPolicy: group.joinPolicy,
+                postPolicy: group.postPolicy,
+                commentPolicy: group.commentPolicy,
+              }}
+            />
+            {overview.role === "owner" ? <OwnerDangerZone groupId={groupId} groupName={group.name} /> : null}
+          </>
         ) : null}
       </div>
     </div>
@@ -276,4 +279,12 @@ async function MembersTab({ groupId }: { groupId: string }) {
 async function InvitesTab({ groupId }: { groupId: string }) {
   const invites = await (await serverApi()).manage.invites({ groupId });
   return <InvitePanel groupId={groupId} invites={invites} />;
+}
+
+async function OwnerDangerZone({ groupId, groupName }: { groupId: string; groupName: string }) {
+  const members = await (await serverApi()).manage.members({ groupId });
+  const others = members
+    .filter((m) => m.status === "active" && !m.isSelf)
+    .map(({ userId, name, role }) => ({ userId, name, role }));
+  return <DangerZone groupId={groupId} groupName={groupName} members={others} />;
 }

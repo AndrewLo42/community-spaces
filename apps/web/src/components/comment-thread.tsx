@@ -14,11 +14,13 @@ export interface CommentData {
   id: string;
   parentId: string | null;
   createdAt: Date;
+  editedAt: Date | null;
   removed: boolean;
   body: string | null;
   author: { id: string; name: string; image: string | null } | null;
   canRemove: boolean;
   canReport: boolean;
+  canEdit: boolean;
 }
 
 export function CommentThread({
@@ -92,6 +94,7 @@ function Comment({
   const remove = useMutation(trpc.comment.remove.mutationOptions({ onSuccess: () => router.refresh() }));
   const [replying, setReplying] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (comment.removed) {
     return <p className="text-sm italic text-muted">This comment was removed.</p>;
@@ -103,13 +106,25 @@ function Comment({
       <div className="min-w-0 flex-1">
         <p className="text-sm">
           <span className="font-medium">{comment.author?.name || "Member"}</span>
-          <span className="ml-2 text-xs text-muted">{timeAgo(comment.createdAt)}</span>
+          <span className="ml-2 text-xs text-muted">
+            {timeAgo(comment.createdAt)}
+            {comment.editedAt ? " · edited" : ""}
+          </span>
         </p>
-        <p className="mt-0.5 whitespace-pre-line break-words text-sm leading-relaxed">{comment.body}</p>
-        <div className="mt-1 flex gap-3 text-xs text-muted">
+        {editing ? (
+          <EditCommentForm commentId={comment.id} body={comment.body ?? ""} onDone={() => setEditing(false)} />
+        ) : (
+          <p className="mt-0.5 whitespace-pre-line break-words text-sm leading-relaxed">{comment.body}</p>
+        )}
+        <div className={editing ? "hidden" : "mt-1 flex gap-3 text-xs text-muted"}>
           {canReply ? (
             <button className="hover:text-fg" onClick={() => setReplying((r) => !r)}>
               Reply
+            </button>
+          ) : null}
+          {comment.canEdit ? (
+            <button className="hover:text-fg" onClick={() => setEditing(true)}>
+              Edit
             </button>
           ) : null}
           {comment.canRemove ? (
@@ -200,6 +215,50 @@ function CommentForm({
         ) : null}
         <Button type="submit" disabled={!body.trim() || create.isPending}>
           {create.isPending ? "Posting…" : parentId ? "Reply" : "Comment"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function EditCommentForm({ commentId, body, onDone }: { commentId: string; body: string; onDone: () => void }) {
+  const router = useRouter();
+  const trpc = useTRPC();
+  const update = useMutation(
+    trpc.comment.update.mutationOptions({
+      onSuccess: () => {
+        onDone();
+        router.refresh();
+      },
+    }),
+  );
+  const [value, setValue] = useState(body);
+
+  return (
+    <form
+      className="mt-1 space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate({ commentId, body: value });
+      }}
+    >
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="min-h-16"
+        autoFocus
+        aria-label="Edit comment"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onDone();
+        }}
+      />
+      <div className="flex items-center justify-end gap-2">
+        {update.error ? <span className="mr-auto text-xs text-danger">{errorMessage(update.error)}</span> : null}
+        <Button type="button" variant="ghost" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!value.trim() || value.trim() === body.trim() || update.isPending}>
+          {update.isPending ? "Saving…" : "Save"}
         </Button>
       </div>
     </form>

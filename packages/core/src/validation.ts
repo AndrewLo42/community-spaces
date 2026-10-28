@@ -109,6 +109,12 @@ export const createCommentInput = z.object({
 
 export const commentIdInput = z.object({ commentId: z.string().min(1) });
 
+/** Editing changes the words only; a photo-only post may be left with no text. */
+export const updatePostInput = postIdInput.extend({ body: z.string().trim().max(10_000) });
+export const updateCommentInput = commentIdInput.extend({
+  body: z.string().trim().min(1, "A comment can't be empty").max(4000),
+});
+
 // ─── Group management ────────────────────────────────────────────────────────
 
 export const groupIdInput = z.object({ groupId: z.string().min(1) });
@@ -119,6 +125,10 @@ export const removeMemberInput = memberTargetInput.extend({ ban: z.boolean() });
 export const setRoleInput = memberTargetInput.extend({
   role: z.enum(MEMBER_ROLES.filter((r) => r !== "owner") as [MemberRole, ...MemberRole[]]),
 });
+
+export const transferOwnershipInput = memberTargetInput;
+/** The owner types the group's name to confirm, so a slip can't delete a community. */
+export const deleteGroupInput = groupIdInput.extend({ confirmName: z.string() });
 
 export const updateGroupInput = groupSettingsInput.and(groupIdInput);
 export type UpdateGroupInput = z.infer<typeof updateGroupInput>;

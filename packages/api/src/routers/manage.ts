@@ -3,7 +3,9 @@ import {
   can,
   canChangeRole,
   canModerateMember,
+  canTransferOwnership,
   createInviteInput,
+  deleteGroupInput,
   groupIdInput,
   groupPermissions,
   inviteIdInput,
@@ -14,6 +16,7 @@ import {
   reviewRequestInput,
   roleRank,
   setRoleInput,
+  transferOwnershipInput,
   updateGroupInput,
 } from "@cs/core";
 import {
@@ -28,6 +31,7 @@ import {
   invites,
   isNull,
   memberships,
+  postImages,
   posts,
   reports,
   sql,
@@ -341,6 +345,57 @@ export const manageRouter = router({
     await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:editSettings");
     const { groupId, ...settings } = input;
     await ctx.db.update(groups).set(settings).where(eq(groups.id, groupId));
+    return { ok: true };
+  }),
+
+  // ─── Ownership ─────────────────────────────────────────────────────────────
+
+  /** Hand the group to another member. The old owner stays on as an admin (and can then leave). */
+  transferOwnership: protectedProcedure.input(transferOwnershipInput).mutation(async ({ ctx, input }) => {
+    const access = await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:delete");
+    const target = await findMembership(ctx.db, input.groupId, input.userId);
+    if (!target || !canTransferOwnership(access.permissionContext, target)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Ownership can only go to another active member" });
+    }
+
+    const member = (userId: string) => and(eq(memberships.groupId, input.groupId), eq(memberships.userId, userId));
+    await ctx.db.transaction(async (tx) => {
+      await tx.update(memberships).set({ role: "admin" }).where(member(ctx.user.id));
+      await tx.update(memberships).set({ role: "owner" }).where(member(input.userId));
+    });
+    await notify(ctx.db, [input.userId], {
+      type: "role_changed",
+      groupKey: `role:${input.groupId}`,
+      groupId: input.groupId,
+      actorId: ctx.user.id,
+      data: { role: "owner" },
+    });
+    return { ok: true };
+  }),
+
+  /**
+   * Permanently deletes the group and everything in it (posts, comments,
+   * memberships, reports, invites and notifications cascade), then its photos.
+   */
+  deleteGroup: protectedProcedure.input(deleteGroupInput).mutation(async ({ ctx, input }) => {
+    const access = await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:delete");
+    if (input.confirmName.trim() !== access.group.name.trim()) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Type the group's name exactly to confirm" });
+    }
+
+    const images = await ctx.db
+      .select({ key: postImages.storageKey })
+      .from(postImages)
+      .innerJoin(posts, eq(posts.id, postImages.postId))
+      .where(eq(posts.groupId, input.groupId));
+    await ctx.db.delete(groups).where(eq(groups.id, input.groupId));
+
+    // After the rows are gone: a storage hiccup leaves stray files, never a half-deleted group.
+    try {
+      await ctx.storage.deleteObjects(images.map((i) => i.key));
+    } catch (error) {
+      console.error(`deleteGroup(${input.groupId}): couldn't delete ${images.length} images`, error);
+    }
     return { ok: true };
   }),
 

@@ -1,4 +1,14 @@
-import { canCommentOnPost, canRemoveContent, canReport, canViewPost, commentIdInput, createCommentInput, postIdInput } from "@cs/core";
+import {
+  canCommentOnPost,
+  canEditComment,
+  canRemoveContent,
+  canReport,
+  canViewPost,
+  commentIdInput,
+  createCommentInput,
+  postIdInput,
+  updateCommentInput,
+} from "@cs/core";
 import { and, asc, comments, eq, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadPostAccess } from "../lib/access";
@@ -27,12 +37,14 @@ export const commentRouter = router({
         id: c.id,
         parentId: c.parentId,
         createdAt: c.createdAt,
+        editedAt: removed ? null : c.editedAt,
         removed,
         // Removed comments keep their place in the thread but lose their content.
         body: removed ? null : c.body,
         author: removed ? null : c.author,
         canRemove: !removed && canRemoveContent(access.permissionContext, c),
         canReport: !removed && canReport(access.permissionContext, c),
+        canEdit: canEditComment(access.permissionContext, c, access.post),
       };
     });
   }),
@@ -81,6 +93,22 @@ export const commentRouter = router({
       await notify(ctx.db, [access.post.authorId], { ...event, type: "comment", groupKey: `comment:${input.postId}` });
     }
     return created;
+  }),
+
+  update: protectedProcedure.input(updateCommentInput).mutation(async ({ ctx, input }) => {
+    const [comment] = await ctx.db.select().from(comments).where(eq(comments.id, input.commentId));
+    if (!comment) throw new TRPCError({ code: "NOT_FOUND" });
+    const access = await loadPostAccess(ctx.db, comment.postId, ctx.user.id);
+    if (!access || !canEditComment(access.permissionContext, comment, access.post)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "You can't edit this comment" });
+    }
+    if (input.body !== comment.body) {
+      await ctx.db
+        .update(comments)
+        .set({ body: input.body, editedAt: new Date() })
+        .where(eq(comments.id, input.commentId));
+    }
+    return { ok: true };
   }),
 
   remove: protectedProcedure.input(commentIdInput).mutation(async ({ ctx, input }) => {

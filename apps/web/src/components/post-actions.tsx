@@ -5,10 +5,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTRPC } from "@/trpc/client";
+import { EditPostDialog } from "./edit-post-dialog";
 import { ReportDialog } from "./report-dialog";
 import { Button } from "./ui";
 
-export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "pinned" | "locked" | "viewer"> }) {
+export function PostActions({
+  post,
+}: {
+  post: Pick<PostView, "id" | "body" | "status" | "pinned" | "locked" | "viewer">;
+}) {
   const router = useRouter();
   const trpc = useTRPC();
   const onSuccess = () => router.refresh();
@@ -29,7 +34,8 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
   }, [open]);
 
   const [reporting, setReporting] = useState(false);
-  const { canModerate, canRemove, canReport } = post.viewer;
+  const [editing, setEditing] = useState(false);
+  const { canModerate, canRemove, canReport, canEdit } = post.viewer;
   const postId = post.id;
 
   if (post.status === "pending" && canModerate) {
@@ -50,9 +56,10 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
     );
   }
 
-  if (!canModerate && !canRemove && !canReport) return null;
+  if (!canModerate && !canRemove && !canReport && !canEdit) return null;
 
   const items: Array<{ label: string; run: () => void; danger?: boolean }> = [];
+  if (canEdit) items.push({ label: "Edit post", run: () => setEditing(true) });
   if (canModerate && post.status === "published") {
     items.push({ label: post.pinned ? "Unpin" : "Pin to top", run: () => pin.mutate({ postId, value: !post.pinned }) });
     items.push({
@@ -94,6 +101,7 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
         </div>
       ) : null}
       {reporting ? <ReportDialog targetType="post" targetId={postId} onClose={() => setReporting(false)} /> : null}
+      {editing ? <EditPostDialog postId={postId} body={post.body} onClose={() => setEditing(false)} /> : null}
     </div>
   );
 }

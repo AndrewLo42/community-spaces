@@ -28,6 +28,7 @@ describe("notification wording", () => {
     assert.equal(role("admin"), "You're now an admin of Riverside Garden");
     assert.equal(role("moderator"), "You're now a moderator of Riverside Garden");
     assert.equal(role("member"), "Your role in Riverside Garden changed to member");
+    assert.equal(role("owner"), "You're now the owner of Riverside Garden");
   });
 });
 

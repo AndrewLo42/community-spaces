@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GroupSettingsFields, type GroupSettings } from "@/components/group-settings-fields";
-import { Button, Card, Field, Select } from "@/components/ui";
+import { Button, Card, Field, Input, Select } from "@/components/ui";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { timeAgo } from "@/lib/time";
 import { useTRPC } from "@/trpc/client";
@@ -339,5 +339,90 @@ export function SettingsForm({ groupId, initial }: { groupId: string; initial: G
         </Button>
       </div>
     </form>
+  );
+}
+
+// ─── Danger zone (owner only) ────────────────────────────────────────────────
+
+export function DangerZone({
+  groupId,
+  groupName,
+  members,
+}: {
+  groupId: string;
+  groupName: string;
+  /** Other active members, who could take over. */
+  members: Array<{ userId: string; name: string; role: MemberRole }>;
+}) {
+  const router = useRouter();
+  const trpc = useTRPC();
+  const transfer = useMutation(trpc.manage.transferOwnership.mutationOptions({ onSuccess: () => router.refresh() }));
+  const remove = useMutation(
+    trpc.manage.deleteGroup.mutationOptions({
+      onSuccess: () => {
+        router.push("/");
+        router.refresh();
+      },
+    }),
+  );
+  const [newOwner, setNewOwner] = useState("");
+  const [confirmName, setConfirmName] = useState("");
+  const chosen = members.find((m) => m.userId === newOwner);
+
+  return (
+    <section className="mt-12 space-y-4 rounded-xl border border-danger/40 p-5">
+      <h2 className="font-serif text-xl font-semibold">Danger zone</h2>
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium">Transfer ownership</h3>
+        <p className="text-xs text-muted">
+          The new owner gets full control. You'll stay on as an admin, and can leave the group afterwards.
+        </p>
+        {members.length === 0 ? (
+          <p className="text-sm text-muted">There's no one else in the group to hand it to yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Select value={newOwner} onChange={(e) => setNewOwner(e.target.value)} className="w-auto min-w-48" aria-label="New owner">
+              <option value="">Choose a member…</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.name || "Unnamed member"} ({ROLE_LABELS[m.role]})
+                </option>
+              ))}
+            </Select>
+            <Button
+              variant="secondary"
+              disabled={!chosen || transfer.isPending}
+              onClick={() => {
+                if (chosen && confirm(`Make ${chosen.name || "this member"} the owner of ${groupName}? You'll become an admin.`)) {
+                  transfer.mutate({ groupId, userId: chosen.userId });
+                }
+              }}
+            >
+              {transfer.isPending ? "Transferring…" : "Transfer ownership"}
+            </Button>
+          </div>
+        )}
+        <ErrorText error={transfer.error} />
+      </div>
+
+      <div className="space-y-2 border-t border-line pt-4">
+        <h3 className="text-sm font-medium">Delete this group</h3>
+        <p className="text-xs text-muted">
+          Permanently removes the group with every post, comment and photo in it. This can't be undone.
+        </p>
+        <Field label={`Type "${groupName}" to confirm`}>
+          <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" />
+        </Field>
+        <Button
+          className="bg-danger text-white"
+          disabled={confirmName.trim() !== groupName.trim() || remove.isPending}
+          onClick={() => remove.mutate({ groupId, confirmName })}
+        >
+          {remove.isPending ? "Deleting…" : "Delete group forever"}
+        </Button>
+        <ErrorText error={remove.error} />
+      </div>
+    </section>
   );
 }

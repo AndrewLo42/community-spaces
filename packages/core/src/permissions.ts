@@ -168,6 +168,29 @@ export function canRemoveContent(ctx: PermissionContext, content: { authorId: st
   return canEditContent(ctx, content) || can(ctx, "post:moderate");
 }
 
+/** Authors can fix their post while they can still see it, unless it was removed. */
+export function canEditPost(ctx: PermissionContext, post: { authorId: string; status: PostStatus }): boolean {
+  return canEditContent(ctx, post) && post.status !== "removed" && canViewPost(ctx, post);
+}
+
+/**
+ * Same for comments, plus: a locked post's discussion is closed, so only
+ * moderators can still change what's there.
+ */
+export function canEditComment(
+  ctx: PermissionContext,
+  comment: { authorId: string; status: "visible" | "removed" },
+  post: { authorId: string; status: PostStatus; locked: boolean },
+): boolean {
+  if (!canEditContent(ctx, comment) || comment.status === "removed" || !canViewPost(ctx, post)) return false;
+  return !post.locked || isAtLeast(activeRole(ctx), "moderator");
+}
+
+/** Only the owner hands the group over, and only to another active member. */
+export function canTransferOwnership(ctx: PermissionContext, target: { userId: string; status: MembershipStatus }): boolean {
+  return activeRole(ctx) === "owner" && target.userId !== ctx.userId && target.status === "active";
+}
+
 /**
  * The actor must outrank both the target's current role and the role being
  * assigned. So the owner can promote to admin, admins can manage moderators

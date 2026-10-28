@@ -39,9 +39,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       </ButtonLink>
                     </span>
                     <NotificationBell initialCount={unread} />
-                    <ButtonLink href="/profile" variant="ghost" className="px-2 sm:px-4" aria-label="Your profile">
+                    <ButtonLink href="/profile" variant="ghost" className="px-2 sm:px-4">
                       <span className="sm:hidden">
                         <Avatar name={user.name || user.email} image={user.image} size="sm" />
+                        <span className="sr-only">Your profile</span>
                       </span>
                       <span className="hidden max-w-40 truncate sm:inline">{user.name || "Profile"}</span>
                     </ButtonLink>

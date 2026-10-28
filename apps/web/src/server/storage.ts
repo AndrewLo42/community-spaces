@@ -1,7 +1,8 @@
+import { rm } from "node:fs/promises";
 import path from "node:path";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { Storage } from "@cs/api/storage";
+import { UPLOAD_KEY_PATTERN, type Storage } from "@cs/api/storage";
 import { findRepoRoot } from "@cs/db";
 
 export const isR2Configured = Boolean(process.env.R2_BUCKET);
@@ -15,6 +16,11 @@ function localStorage(): Storage {
       return { url: `/api/uploads/${key}`, headers: { "Content-Type": contentType } };
     },
     publicUrl: (key) => `/api/uploads/${key}`,
+    async deleteObjects(keys) {
+      // The pattern check keeps a bad key from ever pointing outside the uploads folder.
+      const safe = keys.filter((k) => UPLOAD_KEY_PATTERN.test(k));
+      await Promise.all(safe.map((k) => rm(path.join(localUploadDir, k), { force: true })));
+    },
   };
 }
 
@@ -38,6 +44,13 @@ function r2Storage(): Storage {
       return { url, headers: { "Content-Type": contentType } };
     },
     publicUrl: (key) => `${publicBase}/${key}`,
+    async deleteObjects(keys) {
+      // S3's batch delete takes up to 1000 keys per request.
+      for (let i = 0; i < keys.length; i += 1000) {
+        const batch = keys.slice(i, i + 1000).map((Key) => ({ Key }));
+        await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }));
+      }
+    },
   };
 }
 

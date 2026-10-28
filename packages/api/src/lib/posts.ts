@@ -1,4 +1,4 @@
-import { can, canCommentOnPost, canRemoveContent, canReport, type PermissionContext } from "@cs/core";
+import { can, canCommentOnPost, canEditPost, canRemoveContent, canReport, type PermissionContext } from "@cs/core";
 import { and, desc, eq, lt, or, posts, type Db, type SQL } from "@cs/db";
 import type { Storage } from "../storage";
 
@@ -52,6 +52,7 @@ export function toPostView(row: PostRow, ctx: PermissionContext, storage: Storag
       height: img.height,
     })),
     viewer: {
+      canEdit: canEditPost(ctx, row),
       canRemove: canRemoveContent(ctx, row),
       canModerate: can(ctx, "post:moderate"),
       canComment: canCommentOnPost(ctx, row),

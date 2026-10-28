@@ -9,6 +9,8 @@ export interface Storage {
     headers: Record<string, string>;
   }>;
   publicUrl(key: string): string;
+  /** Best effort: missing keys are ignored. */
+  deleteObjects(keys: string[]): Promise<void>;
 }
 
 /** Keys are namespaced by uploader so a post can only attach its author's images. */

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   can,
+  canEditPost,
   canRemoveContent,
   canViewPost,
   createPostInput,
@@ -10,6 +11,7 @@ import {
   postFlagInput,
   postIdInput,
   reviewPostInput,
+  updatePostInput,
   type MemberRole,
   type PermissionContext,
 } from "@cs/core";
@@ -137,6 +139,25 @@ export const postRouter = router({
     });
     if (status === "pending") await notifyModQueue(ctx.db, input.groupId, ctx.user.id);
     return { id: post.id, status };
+  }),
+
+  update: protectedProcedure.input(updatePostInput).mutation(async ({ ctx, input }) => {
+    const access = await loadPostAccess(ctx.db, input.postId, ctx.user.id);
+    if (!access || !canEditPost(access.permissionContext, access.post)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "You can't edit this post" });
+    }
+    if (input.body.length === 0) {
+      const [image] = await ctx.db
+        .select({ id: postImages.id })
+        .from(postImages)
+        .where(eq(postImages.postId, input.postId))
+        .limit(1);
+      if (!image) throw new TRPCError({ code: "BAD_REQUEST", message: "Write something or keep a photo" });
+    }
+    if (input.body !== access.post.body) {
+      await ctx.db.update(posts).set({ body: input.body, editedAt: new Date() }).where(eq(posts.id, input.postId));
+    }
+    return { ok: true };
   }),
 
   remove: protectedProcedure.input(postIdInput).mutation(async ({ ctx, input }) => {

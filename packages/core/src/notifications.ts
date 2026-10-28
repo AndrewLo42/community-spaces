@@ -35,6 +35,7 @@ export function describeNotification(n: NotificationSummary): string {
       return `You're now a member of ${group}`;
     case "role_changed": {
       const role = n.data?.role as MemberRole | undefined;
+      if (role === "owner") return `You're now the owner of ${group}`;
       return role && role !== "member"
         ? `You're now ${role === "admin" ? "an" : "a"} ${ROLE_LABELS[role].toLowerCase()} of ${group}`
         : `Your role in ${group} changed to member`;

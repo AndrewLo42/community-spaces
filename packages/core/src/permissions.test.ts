@@ -6,9 +6,12 @@ import {
   canAcceptInvite,
   canChangeRole,
   canCommentOnPost,
+  canEditComment,
+  canEditPost,
   canModerateMember,
   canReport,
   canRemoveContent,
+  canTransferOwnership,
   canViewPost,
   type GroupRules,
   type PermissionContext,
@@ -141,6 +144,48 @@ describe("commenting", () => {
   it("pending posts can't be commented on, even by moderators", () => {
     const pending = { locked: false, status: "pending" as const };
     assert.equal(canCommentOnPost(ctx({}, { role: "moderator" }), pending), false);
+  });
+});
+
+describe("editing", () => {
+  const post = { authorId: "author", status: "published" as const, locked: false };
+
+  it("only the author edits a post, and not once it's removed", () => {
+    assert.equal(canEditPost(ctx({}, { role: "member" }, "author"), post), true);
+    assert.equal(canEditPost(ctx({}, { role: "owner" }, "owner"), post), false);
+    assert.equal(canEditPost(ctx({}, { role: "member" }, "author"), { ...post, status: "removed" }), false);
+  });
+
+  it("authors can edit a pending post they're waiting on", () => {
+    assert.equal(canEditPost(ctx({}, { role: "member" }, "author"), { ...post, status: "pending" }), true);
+  });
+
+  it("authors who lose access to a private group can't edit there", () => {
+    assert.equal(canEditPost(ctx({ visibility: "private" }, null, "author"), post), false);
+  });
+
+  it("comments on locked posts are frozen for everyone but moderators", () => {
+    const comment = { authorId: "author", status: "visible" as const };
+    const locked = { ...post, locked: true };
+    assert.equal(canEditComment(ctx({}, { role: "member" }, "author"), comment, post), true);
+    assert.equal(canEditComment(ctx({}, { role: "member" }, "author"), comment, locked), false);
+    assert.equal(canEditComment(ctx({}, { role: "moderator" }, "author"), comment, locked), true);
+    assert.equal(canEditComment(ctx({}, { role: "member" }, "other"), comment, post), false);
+  });
+});
+
+describe("ownership", () => {
+  it("only the owner transfers, and only to another active member", () => {
+    const active = { userId: "m", status: "active" as const };
+    assert.equal(canTransferOwnership(ctx({}, { role: "owner" }, "o"), active), true);
+    assert.equal(canTransferOwnership(ctx({}, { role: "admin" }, "a"), active), false);
+    assert.equal(canTransferOwnership(ctx({}, { role: "owner" }, "o"), { userId: "o", status: "active" }), false);
+    assert.equal(canTransferOwnership(ctx({}, { role: "owner" }, "o"), { userId: "m", status: "banned" }), false);
+  });
+
+  it("only the owner can delete the group", () => {
+    assert.equal(can(ctx({}, { role: "owner" }), "group:delete"), true);
+    assert.equal(can(ctx({}, { role: "admin" }), "group:delete"), false);
   });
 });
 

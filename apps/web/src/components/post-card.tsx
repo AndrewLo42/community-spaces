@@ -33,6 +33,7 @@ export function PostCard({
               </>
             ) : null}
             <time dateTime={post.createdAt.toISOString()}>{timeAgo(post.createdAt)}</time>
+            {post.editedAt ? <span title={`Edited ${timeAgo(post.editedAt)}`}> · edited</span> : null}
             {post.pinned ? " · Pinned" : ""}
             {post.locked ? " · Comments locked" : ""}
           </p>
