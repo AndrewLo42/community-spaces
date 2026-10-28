@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GroupSettingsFields, type GroupSettings } from "@/components/group-settings-fields";
+import { ImageField } from "@/components/image-field";
 import { Button, Card, Field, Input, Select } from "@/components/ui";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { timeAgo } from "@/lib/time";
@@ -426,3 +427,23 @@ export function DangerZone({
     </section>
   );
 }
+
+// ─── Banner ──────────────────────────────────────────────────────────────────
+
+export function BannerField({ groupId, bannerUrl, accentColor }: { groupId: string; bannerUrl: string | null; accentColor: string }) {
+  const router = useRouter();
+  const trpc = useTRPC();
+  const setBanner = useMutation(trpc.manage.setBanner.mutationOptions({ onSuccess: () => router.refresh() }));
+
+  return (
+    <ImageField
+      purpose="banner"
+      label="Banner photo"
+      hint="Shown across the top of the group page. Wide photos work best."
+      currentUrl={bannerUrl}
+      placeholder={<div className="size-full" style={{ background: accentColor }} />}
+      onSave={(key) => setBanner.mutateAsync({ groupId, key })}
+    />
+  );
+}
+

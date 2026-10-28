@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
+import { AvatarField } from "./avatar-field";
 import { DigestForm } from "./digest-form";
 import { ProfileForm } from "./profile-form";
 
@@ -20,6 +21,9 @@ export default async function ProfilePage() {
       <p className="mt-1 text-sm text-muted">
         Signed in as {me.email}. Profiles stay small on purpose: just enough for neighbors to recognize you.
       </p>
+      <div className="mt-6">
+        <AvatarField name={me.name} image={me.image} />
+      </div>
       <div className="mt-6">
         <ProfileForm initial={{ name: me.name, bio: me.bio }} />
       </div>

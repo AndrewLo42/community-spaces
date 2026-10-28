@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { UPLOAD_KEY_PATTERN, userUploadPrefix } from "@cs/api/storage";
+import { UPLOAD_KEY_PATTERN, uploadOwner } from "@cs/api/storage";
 import { MAX_IMAGE_BYTES } from "@cs/core";
+import { and, eq, isNull, uploads } from "@cs/db";
 import { auth } from "@/server/auth";
+import { db } from "@/server/db";
 import { isR2Configured, localUploadDir } from "@/server/storage";
 
 // Dev-only stand-in for R2: accepts the same direct PUT the client makes to a
@@ -22,10 +24,14 @@ export async function PUT(req: Request, { params }: Params) {
   const key = await resolveKey(params);
   if (!key) return new Response("Bad key", { status: 400 });
 
+  // Like a presigned URL: only the key the API issued to this user, and only before it's attached.
   const session = await auth.api.getSession({ headers: req.headers });
-  if (!session || !key.startsWith(userUploadPrefix(session.user.id))) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  if (!session || uploadOwner(key) !== session.user.id) return new Response("Forbidden", { status: 403 });
+  const [issued] = await db
+    .select({ key: uploads.key })
+    .from(uploads)
+    .where(and(eq(uploads.key, key), isNull(uploads.attachedAt)));
+  if (!issued) return new Response("Forbidden", { status: 403 });
 
   const body = Buffer.from(await req.arrayBuffer());
   if (body.length === 0 || body.length > MAX_IMAGE_BYTES) return new Response("Too large", { status: 413 });

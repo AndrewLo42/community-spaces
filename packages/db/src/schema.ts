@@ -54,7 +54,9 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
+  /** Public URL (Better Auth's field); imageKey is the stored object behind it, if we host it. */
   image: text("image"),
+  imageKey: text("image_key"),
   bio: text("bio").notNull().default(""),
   emailDigest: emailDigest("email_digest").notNull().default("weekly"),
   /** When this user's digest window last closed (sent, or checked with nothing to say). */
@@ -283,6 +285,26 @@ export const invites = pgTable(
     ...timestamps,
   },
   (t) => [index("invites_group_idx").on(t.groupId)],
+);
+
+/**
+ * Every file a browser uploads gets a row when its upload URL is issued.
+ * Attaching it to a post, banner or avatar sets attachedAt; anything still
+ * unattached after a day is deleted by the cleanup cron.
+ */
+export const uploads = pgTable(
+  "uploads",
+  {
+    key: text("key").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull(),
+    size: integer("size").notNull(),
+    attachedAt: timestamp("attached_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("uploads_unattached_idx").on(t.createdAt).where(sql`${t.attachedAt} is null`)],
 );
 
 export const notificationType = pgEnum("notification_type", NOTIFICATION_TYPES);

@@ -10,6 +10,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess } from "../lib/access";
 import { notifyModQueue } from "../lib/notify";
+import { containsPattern } from "../lib/search";
+import type { Storage } from "../storage";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 20;
@@ -23,7 +25,13 @@ const groupCard = {
   accentColor: groups.accentColor,
   visibility: groups.visibility,
   memberCount: groups.memberCount,
+  bannerKey: groups.bannerKey,
 };
+
+/** Swaps the stored banner key for a URL the browser can load. */
+function withBanner<T extends { bannerKey: string | null }>(storage: Storage, { bannerKey, ...g }: T) {
+  return { ...g, bannerUrl: bannerKey ? storage.publicUrl(bannerKey) : null };
+}
 
 export const groupRouter = router({
   discover: publicProcedure.input(discoverGroupsInput).query(async ({ ctx, input }) => {
@@ -34,7 +42,7 @@ export const groupRouter = router({
     if (input.query) {
       const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
       // Full-text match, plus a substring match so partial words ("gard") still find things.
-      filters.push(or(sql`${groups.searchVector} @@ ${tsquery}`, ilike(groups.name, `%${input.query}%`))!);
+      filters.push(or(sql`${groups.searchVector} @@ ${tsquery}`, ilike(groups.name, containsPattern(input.query)))!);
       order.unshift(desc(sql`ts_rank(${groups.searchVector}, ${tsquery})`));
     }
 
@@ -47,19 +55,20 @@ export const groupRouter = router({
       .offset(input.cursor);
 
     return {
-      groups: rows.slice(0, PAGE_SIZE),
+      groups: rows.slice(0, PAGE_SIZE).map((g) => withBanner(ctx.storage, g)),
       nextCursor: rows.length > PAGE_SIZE ? input.cursor + PAGE_SIZE : null,
     };
   }),
 
   /** Groups the viewer belongs to, for the home screen. */
   mine: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db
+    const rows = await ctx.db
       .select({ ...groupCard, role: memberships.role })
       .from(memberships)
       .innerJoin(groups, eq(groups.id, memberships.groupId))
       .where(and(eq(memberships.userId, ctx.user.id), eq(memberships.status, "active")))
       .orderBy(groups.name);
+    return rows.map((g) => withBanner(ctx.storage, g));
   }),
 
   bySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ ctx, input }) => {
@@ -70,7 +79,11 @@ export const groupRouter = router({
     }
     const { group, membership, permissionContext } = loaded;
     const { searchVector: _searchVector, ...publicGroup } = group;
-    return { group: publicGroup, membership, permissions: groupPermissions(permissionContext) };
+    return {
+      group: withBanner(ctx.storage, publicGroup),
+      membership,
+      permissions: groupPermissions(permissionContext),
+    };
   }),
 
   isSlugAvailable: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ ctx, input }) => {

@@ -13,6 +13,7 @@ import {
   POST_POLICIES,
   REPORT_REASONS,
   REPORT_TARGETS,
+  UPLOAD_PURPOSES,
   type MemberRole,
 } from "./constants";
 
@@ -71,6 +72,7 @@ export const updateProfileInput = z.object({
 });
 
 export const createUploadInput = z.object({
+  purpose: z.enum(UPLOAD_PURPOSES).default("post"),
   contentType: z.enum(IMAGE_CONTENT_TYPES),
   size: z.number().int().positive().max(MAX_IMAGE_BYTES, "Image is too large"),
 });
@@ -125,6 +127,11 @@ export const removeMemberInput = memberTargetInput.extend({ ban: z.boolean() });
 export const setRoleInput = memberTargetInput.extend({
   role: z.enum(MEMBER_ROLES.filter((r) => r !== "owner") as [MemberRole, ...MemberRole[]]),
 });
+
+export const membersInput = groupIdInput.extend({ query: z.string().trim().max(100).optional() });
+/** null removes the image. */
+export const setBannerInput = groupIdInput.extend({ key: z.string().min(1).max(200).nullable() });
+export const setAvatarInput = z.object({ key: z.string().min(1).max(200).nullable() });
 
 export const transferOwnershipInput = memberTargetInput;
 /** The owner types the group's name to confirm, so a slip can't delete a community. */

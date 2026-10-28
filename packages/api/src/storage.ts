@@ -1,3 +1,5 @@
+import type { UploadPurpose } from "@cs/core";
+
 /**
  * Where uploaded images live. The host app provides the implementation:
  * local disk in dev, Cloudflare R2 in production. Clients upload directly to
@@ -13,9 +15,16 @@ export interface Storage {
   deleteObjects(keys: string[]): Promise<void>;
 }
 
-/** Keys are namespaced by uploader so a post can only attach its author's images. */
-export function userUploadPrefix(userId: string): string {
-  return `posts/${userId}/`;
+const FOLDERS: Record<UploadPurpose, string> = { post: "posts", banner: "banners", avatar: "avatars" };
+
+/** Keys are "<folder>/<uploaderId>/<uuid>.<ext>", so ownership can be read straight off the key. */
+export function userUploadPrefix(userId: string, purpose: UploadPurpose): string {
+  return `${FOLDERS[purpose]}/${userId}/`;
 }
 
-export const UPLOAD_KEY_PATTERN = /^posts\/[A-Za-z0-9_-]+\/[A-Za-z0-9-]+\.(webp|jpg|png)$/;
+export const UPLOAD_KEY_PATTERN = /^(posts|banners|avatars)\/[A-Za-z0-9_-]+\/[A-Za-z0-9-]+\.(webp|jpg|png)$/;
+
+/** The uploader's user id, or null if the key isn't one of ours. */
+export function uploadOwner(key: string): string | null {
+  return UPLOAD_KEY_PATTERN.test(key) ? key.split("/")[1]! : null;
+}

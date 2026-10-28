@@ -7,10 +7,10 @@ import { Avatar } from "@/components/avatar";
 import type { GroupSettings } from "@/components/group-settings-fields";
 import { MarkSeen } from "@/components/mark-seen";
 import { PostCard } from "@/components/post-card";
-import { Card, cx, EmptyState } from "@/components/ui";
+import { Button, ButtonLink, Card, cx, EmptyState, Input } from "@/components/ui";
 import { timeAgo } from "@/lib/time";
 import { serverApi } from "@/server/api";
-import { DangerZone, InvitePanel, MemberActions, ReportActions, RequestActions, SettingsForm } from "./actions";
+import { BannerField, DangerZone, InvitePanel, MemberActions, ReportActions, RequestActions, SettingsForm } from "./actions";
 
 export const metadata: Metadata = { title: "Manage group" };
 
@@ -24,7 +24,7 @@ export default async function ManagePage({
   searchParams,
 }: {
   params: Params;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string }>;
 }) {
   const { slug } = await params;
   const api = await serverApi();
@@ -53,7 +53,8 @@ export default async function ManagePage({
     posts: counts.pendingPosts,
     reports: counts.openReports,
   };
-  const requested = (await searchParams).tab as Tab | undefined;
+  const { tab: requestedTab, q } = await searchParams;
+  const requested = requestedTab as Tab | undefined;
   const tab: Tab =
     requested && available.includes(requested)
       ? requested
@@ -99,10 +100,13 @@ export default async function ManagePage({
         {tab === "requests" ? <RequestsTab groupId={groupId} /> : null}
         {tab === "posts" ? <PendingPostsTab groupId={groupId} /> : null}
         {tab === "reports" ? <ReportsTab groupId={groupId} /> : null}
-        {tab === "members" ? <MembersTab groupId={groupId} /> : null}
+        {tab === "members" ? <MembersTab groupId={groupId} slug={slug} query={q?.trim() || undefined} /> : null}
         {tab === "invites" ? <InvitesTab groupId={groupId} /> : null}
         {tab === "settings" ? (
           <>
+            <div className="mb-8">
+              <BannerField groupId={groupId} bannerUrl={group.bannerUrl} accentColor={group.accentColor} />
+            </div>
             <SettingsForm
               groupId={groupId}
               initial={{
@@ -215,13 +219,31 @@ async function ReportsTab({ groupId }: { groupId: string }) {
   );
 }
 
-async function MembersTab({ groupId }: { groupId: string }) {
-  const members = await (await serverApi()).manage.members({ groupId });
+const MEMBERS_SHOWN = 200; // matches the API's cap
+
+async function MembersTab({ groupId, slug, query }: { groupId: string; slug: string; query?: string }) {
+  const members = await (await serverApi()).manage.members({ groupId, query });
   const active = members.filter((m) => m.status === "active");
   const banned = members.filter((m) => m.status === "banned");
 
   return (
     <div className="space-y-8">
+      <form action={`/g/${slug}/manage`} className="flex gap-2">
+        <input type="hidden" name="tab" value="members" />
+        <Input name="q" defaultValue={query} placeholder="Search members by name" aria-label="Search members" />
+        <Button type="submit" variant="secondary">
+          Search
+        </Button>
+        {query ? (
+          <ButtonLink href={`/g/${slug}/manage?tab=members`} variant="ghost">
+            Clear
+          </ButtonLink>
+        ) : null}
+      </form>
+      {query && members.length === 0 ? <EmptyState title={`No members match "${query}"`} /> : null}
+      {members.length >= MEMBERS_SHOWN ? (
+        <p className="text-xs text-muted">Showing the first {MEMBERS_SHOWN} alphabetically. Search to find someone specific.</p>
+      ) : null}
       <Card className="divide-y divide-line">
         {active.map((m) => (
           <div key={m.userId} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">

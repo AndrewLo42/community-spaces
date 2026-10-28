@@ -62,8 +62,10 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 5. For photos: create an R2 bucket with public access, set the `R2_*` variables, and add a
    CORS rule allowing `PUT` from your site's origin (browsers upload straight to R2).
 
-6. Email digests run from a daily Vercel Cron (`apps/web/vercel.json`, 15:00 UTC). It handles both
-   daily and weekly subscribers. To try it locally:
-   `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`
+6. Two daily Vercel Cron jobs (`apps/web/vercel.json`), both protected by `CRON_SECRET`:
+   - `/api/cron/digest` (15:00 UTC) sends daily and weekly email digests.
+   - `/api/cron/cleanup` (09:00 UTC) deletes photos uploaded but never used (after 24 hours).
+
+   To try one locally: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`
 
 Vercel's Hobby plan is non-commercial. Move to Pro once the app makes money.

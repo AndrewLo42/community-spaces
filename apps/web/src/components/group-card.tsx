@@ -7,6 +7,7 @@ export interface GroupCardData {
   description: string;
   category: string;
   accentColor: string;
+  bannerUrl: string | null;
   visibility: "public" | "private" | "hidden";
   memberCount: number;
 }
@@ -17,7 +18,12 @@ export function GroupCard({ group }: { group: GroupCardData }) {
       href={`/g/${group.slug}`}
       className="group block overflow-hidden rounded-xl border border-line bg-surface transition hover:border-muted/50"
     >
-      <div className="h-2" style={{ background: group.accentColor }} />
+      {group.bannerUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={group.bannerUrl} alt="" loading="lazy" className="h-24 w-full object-cover" />
+      ) : (
+        <div className="h-2" style={{ background: group.accentColor }} />
+      )}
       <div className="space-y-2 p-4">
         <h3 className="font-serif text-lg font-semibold leading-snug group-hover:underline">{group.name}</h3>
         <p className="line-clamp-2 text-sm text-muted">{group.description || "No description yet."}</p>

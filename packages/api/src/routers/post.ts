@@ -1,11 +1,9 @@
-import { randomUUID } from "node:crypto";
 import {
   can,
   canEditPost,
   canRemoveContent,
   canViewPost,
   createPostInput,
-  createUploadInput,
   feedInput,
   groupFeedInput,
   postFlagInput,
@@ -21,10 +19,8 @@ import { loadGroupAccess, loadPostAccess } from "../lib/access";
 import { removePost } from "../lib/moderation";
 import { notify, notifyModQueue } from "../lib/notify";
 import { afterCursor, FEED_PAGE_SIZE, findPosts, paginate, toPostView } from "../lib/posts";
-import { userUploadPrefix } from "../storage";
+import { claimUploads } from "../lib/uploads";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
-
-const extensions = { "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" } as const;
 
 export const postRouter = router({
   /** A group's feed. The first page also carries pinned posts and pending posts the viewer may see. */
@@ -101,29 +97,23 @@ export const postRouter = router({
     return toPostView(row!, access.permissionContext, ctx.storage);
   }),
 
-  /** Step 1 of attaching a photo: get somewhere to PUT the (already resized) file. */
-  createUploadUrl: protectedProcedure.input(createUploadInput).mutation(async ({ ctx, input }) => {
-    const key = `${userUploadPrefix(ctx.user.id)}${randomUUID()}.${extensions[input.contentType]}`;
-    const upload = await ctx.storage.createUpload({ key, contentType: input.contentType, size: input.size });
-    return { key, ...upload };
-  }),
-
   create: protectedProcedure.input(createPostInput).mutation(async ({ ctx, input }) => {
     const access = await loadGroupAccess(ctx.db, { id: input.groupId }, ctx.user.id);
     if (!access || !can(access.permissionContext, "post:create")) {
       throw new TRPCError({ code: "FORBIDDEN", message: "You can't post in this group" });
     }
-    const prefix = userUploadPrefix(ctx.user.id);
-    if (input.images.some((img) => !img.key.startsWith(prefix))) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid image" });
-    }
-
     const status = can(access.permissionContext, "post:publishWithoutApproval") ? "published" : "pending";
     const post = await ctx.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(posts)
         .values({ groupId: input.groupId, authorId: ctx.user.id, body: input.body, status })
         .returning({ id: posts.id });
+      await claimUploads(
+        tx,
+        ctx.user.id,
+        "post",
+        input.images.map((img) => img.key),
+      );
       if (input.images.length > 0) {
         await tx.insert(postImages).values(
           input.images.map((img, position) => ({

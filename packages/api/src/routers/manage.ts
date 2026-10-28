@@ -10,11 +10,13 @@ import {
   groupPermissions,
   inviteIdInput,
   memberTargetInput,
+  membersInput,
   MEMBER_ROLES,
   removeMemberInput,
   resolveReportInput,
   reviewRequestInput,
   roleRank,
+  setBannerInput,
   setRoleInput,
   transferOwnershipInput,
   updateGroupInput,
@@ -27,6 +29,7 @@ import {
   desc,
   eq,
   groups,
+  ilike,
   inArray,
   invites,
   isNull,
@@ -42,10 +45,12 @@ import { TRPCError } from "@trpc/server";
 import { requireGroupAction } from "../lib/access";
 import { removeComment, removePost } from "../lib/moderation";
 import { notify } from "../lib/notify";
+import { claimUploads, discardUploads } from "../lib/uploads";
 import { findPosts, toPostView } from "../lib/posts";
+import { containsPattern } from "../lib/search";
 import { protectedProcedure, router } from "../trpc";
 
-const MAX_MEMBERS_LISTED = 1000;
+const MAX_MEMBERS_LISTED = 200;
 
 async function findMembership(db: Db, groupId: string, userId: string) {
   const [m] = await db
@@ -77,7 +82,7 @@ export const manageRouter = router({
     ]);
     const { searchVector: _sv, ...group } = access.group;
     return {
-      group,
+      group: { ...group, bannerUrl: group.bannerKey ? ctx.storage.publicUrl(group.bannerKey) : null },
       role: access.membership!.role,
       permissions: groupPermissions(access.permissionContext),
       counts: { requests: requests?.n ?? 0, pendingPosts: pendingPosts?.n ?? 0, openReports: openReports?.n ?? 0 },
@@ -128,7 +133,8 @@ export const manageRouter = router({
 
   // ─── Members ───────────────────────────────────────────────────────────────
 
-  members: protectedProcedure.input(groupIdInput).query(async ({ ctx, input }) => {
+  /** Up to MAX_MEMBERS_LISTED members, optionally filtered by name. Big groups search instead of scrolling. */
+  members: protectedProcedure.input(membersInput).query(async ({ ctx, input }) => {
     const access = await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:manage");
     const actorRole = access.membership!.role;
 
@@ -143,7 +149,13 @@ export const manageRouter = router({
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.groupId, input.groupId), inArray(memberships.status, ["active", "banned"])))
+      .where(
+        and(
+          eq(memberships.groupId, input.groupId),
+          inArray(memberships.status, ["active", "banned"]),
+          input.query ? ilike(users.name, containsPattern(input.query)) : undefined,
+        ),
+      )
       .orderBy(asc(users.name))
       .limit(MAX_MEMBERS_LISTED);
 
@@ -348,6 +360,16 @@ export const manageRouter = router({
     return { ok: true };
   }),
 
+  /** Set (or clear, with null) the group's banner photo. The old file is deleted. */
+  setBanner: protectedProcedure.input(setBannerInput).mutation(async ({ ctx, input }) => {
+    const access = await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:editSettings");
+    if (input.key) await claimUploads(ctx.db, ctx.user.id, "banner", [input.key]);
+    await ctx.db.update(groups).set({ bannerKey: input.key }).where(eq(groups.id, input.groupId));
+    const previous = access.group.bannerKey;
+    if (previous && previous !== input.key) await discardUploads(ctx.db, ctx.storage, [previous]);
+    return { ok: true };
+  }),
+
   // ─── Ownership ─────────────────────────────────────────────────────────────
 
   /** Hand the group to another member. The old owner stays on as an admin (and can then leave). */
@@ -390,12 +412,8 @@ export const manageRouter = router({
       .where(eq(posts.groupId, input.groupId));
     await ctx.db.delete(groups).where(eq(groups.id, input.groupId));
 
-    // After the rows are gone: a storage hiccup leaves stray files, never a half-deleted group.
-    try {
-      await ctx.storage.deleteObjects(images.map((i) => i.key));
-    } catch (error) {
-      console.error(`deleteGroup(${input.groupId}): couldn't delete ${images.length} images`, error);
-    }
+    // After the rows are gone: a storage hiccup leaves files for the cleanup cron, never a half-deleted group.
+    await discardUploads(ctx.db, ctx.storage, [...images.map((i) => i.key), access.group.bannerKey]);
     return { ok: true };
   }),
 

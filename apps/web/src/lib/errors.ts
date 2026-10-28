@@ -8,8 +8,9 @@ export function fieldErrors(error: unknown): Record<string, string | undefined> 
   return Object.fromEntries(Object.entries(errors).map(([k, v]) => [k, v?.[0]]));
 }
 
+/** A sentence to show the user. Validation failures point at the fields; anything else says what the server said. */
 export function errorMessage(error: unknown): string | null {
   if (!error) return null;
-  if (error instanceof TRPCClientError && error.data?.code === "BAD_REQUEST") return "Please fix the highlighted fields.";
+  if (Object.keys(fieldErrors(error)).length > 0) return "Please fix the highlighted fields.";
   return error instanceof Error ? error.message : "Something went wrong";
 }

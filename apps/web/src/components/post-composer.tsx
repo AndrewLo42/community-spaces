@@ -4,7 +4,7 @@ import { MAX_POST_IMAGES } from "@cs/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { prepareImage } from "@/lib/images";
+import { useImageUpload } from "@/lib/use-image-upload";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { useTRPC } from "@/trpc/client";
 import { Button, Card, Textarea } from "./ui";
@@ -19,7 +19,7 @@ interface Attachment {
 export function PostComposer({ groupId, needsApproval }: { groupId: string; needsApproval: boolean }) {
   const router = useRouter();
   const trpc = useTRPC();
-  const createUpload = useMutation(trpc.post.createUploadUrl.mutationOptions());
+  const uploadImage = useImageUpload("post");
   const createPost = useMutation(trpc.post.create.mutationOptions());
 
   const [body, setBody] = useState("");
@@ -37,11 +37,7 @@ export function PostComposer({ groupId, needsApproval }: { groupId: string; need
 
   async function upload(file: File, id: string) {
     try {
-      const prepared = await prepareImage(file);
-      const target = await createUpload.mutateAsync({ contentType: prepared.contentType, size: prepared.blob.size });
-      const res = await fetch(target.url, { method: "PUT", headers: target.headers, body: prepared.blob });
-      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      update(id, { state: "ready", image: { key: target.key, width: prepared.width, height: prepared.height } });
+      update(id, { state: "ready", image: await uploadImage(file) });
     } catch {
       update(id, { state: "failed" });
     }

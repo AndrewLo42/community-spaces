@@ -32,6 +32,7 @@ export const inviteRouter = router({
         name: group.name,
         description: group.description,
         accentColor: group.accentColor,
+        bannerUrl: group.bannerKey ? ctx.storage.publicUrl(group.bannerKey) : null,
         memberCount: group.memberCount,
         visibility: group.visibility,
       },

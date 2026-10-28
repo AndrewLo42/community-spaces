@@ -39,7 +39,12 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
   return (
     <div className="mx-auto max-w-md py-10">
       <Card className="overflow-hidden text-center">
-        <div className="h-20" style={{ background: group.accentColor }} />
+        {group.bannerUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={group.bannerUrl} alt="" className="h-28 w-full object-cover" />
+        ) : (
+          <div className="h-20" style={{ background: group.accentColor }} />
+        )}
         <div className="space-y-4 p-6">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">You're invited to join</p>
           <h1 className="font-serif text-3xl font-semibold tracking-tight">{group.name}</h1>

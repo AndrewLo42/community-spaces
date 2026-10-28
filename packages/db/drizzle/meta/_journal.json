@@ -29,6 +29,13 @@
       "when": 1793219086294,
       "tag": "0003_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793224195974,
+      "tag": "0004_uploads_and_avatars",
+      "breakpoints": true
     }
   ]
 }

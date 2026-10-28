@@ -121,4 +121,11 @@ export const MAX_POST_IMAGES = 4;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGE_DIMENSION = 2000;
 export const IMAGE_CONTENT_TYPES = ["image/webp", "image/jpeg", "image/png"] as const;
+/** What an upload is for; it decides the storage folder and how the image is prepared. */
+export const UPLOAD_PURPOSES = ["post", "banner", "avatar"] as const;
+export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
+/** Avatars are cropped square to this many pixels. */
+export const AVATAR_SIZE = 512;
+/** Uploads never attached to anything are deleted after this long. */
+export const UNUSED_UPLOAD_TTL_MS = 24 * 3_600_000;
 export type ImageContentType = (typeof IMAGE_CONTENT_TYPES)[number];

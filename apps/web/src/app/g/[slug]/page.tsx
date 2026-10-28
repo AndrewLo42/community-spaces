@@ -103,7 +103,12 @@ export default async function GroupPage({
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden">
-        <div className="h-24 sm:h-32" style={{ background: group.accentColor }} />
+        {group.bannerUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={group.bannerUrl} alt="" className="h-32 w-full object-cover sm:h-48" />
+        ) : (
+          <div className="h-24 sm:h-32" style={{ background: group.accentColor }} />
+        )}
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">
