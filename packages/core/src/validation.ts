@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   COMMENT_POLICIES,
+  EMAIL_DIGEST_OPTIONS,
   GROUP_ACCENTS,
   GROUP_CATEGORIES,
   GROUP_VISIBILITIES,
@@ -142,4 +143,14 @@ export const createInviteInput = groupIdInput.extend({
   maxUses: z.number().int().positive().max(1000).nullable().default(null),
 });
 export const inviteCodeInput = z.object({ code: z.string().trim().min(1).max(64) });
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const notificationListInput = z.object({ cursor: z.string().max(200).optional() });
+export const markSeenInput = z.union([
+  z.object({ postId: z.string().min(1) }),
+  z.object({ modQueueGroupId: z.string().min(1) }),
+]);
+export const markReadInput = z.object({ ids: z.array(z.string().min(1)).min(1).max(100) });
+export const updatePreferencesInput = z.object({ emailDigest: z.enum(EMAIL_DIGEST_OPTIONS) });
 export const inviteIdInput = groupIdInput.extend({ inviteId: z.string().min(1) });

@@ -2,6 +2,7 @@ import { canReport, canViewPost, createReportInput } from "@cs/core";
 import { and, comments, eq, reports } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadPostAccess } from "../lib/access";
+import { notifyModQueue } from "../lib/notify";
 import { protectedProcedure, router } from "../trpc";
 
 export const reportRouter = router({
@@ -44,6 +45,7 @@ export const reportRouter = router({
         reason: input.reason,
         details: input.details,
       });
+      await notifyModQueue(ctx.db, access.group.id, ctx.user.id);
     }
     return { ok: true };
   }),

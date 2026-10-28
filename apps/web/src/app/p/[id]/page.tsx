@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CommentThread } from "@/components/comment-thread";
+import { MarkSeen } from "@/components/mark-seen";
 import { PostCard } from "@/components/post-card";
 import { serverApi } from "@/server/api";
+import { getSessionUser } from "@/server/auth";
 
 type Params = Promise<{ id: string }>;
 
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function PostPage({ params }: { params: Params }) {
   const { id } = await params;
-  const post = await loadPost(id);
+  const [post, signedIn] = await Promise.all([loadPost(id), getSessionUser().then(Boolean)]);
   const comments = post.status === "published" ? await (await serverApi()).comment.list({ postId: id }) : [];
 
   return (
@@ -35,6 +37,7 @@ export default async function PostPage({ params }: { params: Params }) {
         ← {post.group.name}
       </Link>
       <PostCard post={post} linkToPost={false} />
+      {signedIn ? <MarkSeen postId={post.id} /> : null}
       {post.status === "published" ? (
         <CommentThread postId={post.id} comments={comments} canComment={post.viewer.canComment} locked={post.locked} />
       ) : null}

@@ -9,6 +9,7 @@ import { and, desc, eq, groups, ilike, memberships, ne, or, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess } from "../lib/access";
+import { notifyModQueue } from "../lib/notify";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 20;
@@ -115,6 +116,7 @@ export const groupRouter = router({
         status: "pending",
         requestMessage: input.message,
       });
+      await notifyModQueue(ctx.db, input.groupId, ctx.user.id);
       return { status: "pending" as const };
     }
 

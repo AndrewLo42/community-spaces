@@ -3,13 +3,15 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
+import { DigestForm } from "./digest-form";
 import { ProfileForm } from "./profile-form";
 
 export const metadata: Metadata = { title: "Profile" };
 
 export default async function ProfilePage() {
   if (!(await getSessionUser())) redirect("/sign-in");
-  const me = await (await serverApi()).user.me();
+  const api = await serverApi();
+  const [me, prefs] = await Promise.all([api.user.me(), api.notification.preferences()]);
   if (!me) redirect("/sign-in");
 
   return (
@@ -20,6 +22,9 @@ export default async function ProfilePage() {
       </p>
       <div className="mt-6">
         <ProfileForm initial={{ name: me.name, bio: me.bio }} />
+      </div>
+      <div className="mt-10 border-t border-line pt-6">
+        <DigestForm initial={prefs.emailDigest} />
       </div>
       <div className="mt-10 border-t border-line pt-6">
         <SignOutButton />

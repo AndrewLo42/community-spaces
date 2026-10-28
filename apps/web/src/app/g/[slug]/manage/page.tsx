@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import type { GroupSettings } from "@/components/group-settings-fields";
+import { MarkSeen } from "@/components/mark-seen";
 import { PostCard } from "@/components/post-card";
 import { Card, cx, EmptyState } from "@/components/ui";
 import { timeAgo } from "@/lib/time";
@@ -93,6 +94,7 @@ export default async function ManagePage({
         ))}
       </nav>
 
+      <MarkSeen modQueueGroupId={groupId} />
       <div className="max-w-3xl">
         {tab === "requests" ? <RequestsTab groupId={groupId} /> : null}
         {tab === "posts" ? <PendingPostsTab groupId={groupId} /> : null}

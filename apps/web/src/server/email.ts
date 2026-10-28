@@ -3,6 +3,7 @@ interface Email {
   subject: string;
   text: string;
   html: string;
+  headers?: Record<string, string>;
 }
 
 /** Sends through Resend when configured; otherwise prints to the server log. */
@@ -22,6 +23,7 @@ export async function sendEmail(email: Email): Promise<void> {
       subject: email.subject,
       text: email.text,
       html: email.html,
+      headers: email.headers,
     }),
   });
   if (!res.ok) throw new Error(`Resend error ${res.status}: ${await res.text()}`);

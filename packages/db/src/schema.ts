@@ -1,10 +1,12 @@
 import {
   COMMENT_POLICIES,
   COMMENT_STATUSES,
+  EMAIL_DIGEST_OPTIONS,
   GROUP_VISIBILITIES,
   JOIN_POLICIES,
   MEMBER_ROLES,
   MEMBERSHIP_STATUSES,
+  NOTIFICATION_TYPES,
   POST_POLICIES,
   POST_STATUSES,
   REPORT_STATUSES,
@@ -16,11 +18,13 @@ import {
   customType,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -43,6 +47,8 @@ const tsvector = customType<{ data: string }>({
 
 // ─── Auth (shape required by Better Auth) ────────────────────────────────────
 
+export const emailDigest = pgEnum("email_digest", EMAIL_DIGEST_OPTIONS);
+
 export const users = pgTable("users", {
   id: id(),
   name: text("name").notNull(),
@@ -50,6 +56,9 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   bio: text("bio").notNull().default(""),
+  emailDigest: emailDigest("email_digest").notNull().default("weekly"),
+  /** When this user's digest window last closed (sent, or checked with nothing to say). */
+  lastDigestAt: timestamp("last_digest_at", { withTimezone: true }),
   ...timestamps,
 });
 
@@ -274,6 +283,40 @@ export const invites = pgTable(
     ...timestamps,
   },
   (t) => [index("invites_group_idx").on(t.groupId)],
+);
+
+export const notificationType = pgEnum("notification_type", NOTIFICATION_TYPES);
+
+/**
+ * Similar events coalesce into one unread row via `groupKey`
+ * ("comment:<postId>", "modqueue:<groupId>"…), so three comments on your post
+ * are one notification: "Maria and 2 others commented". Once read, the next
+ * event starts a fresh row.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: notificationType("type").notNull(),
+    groupKey: text("group_key").notNull(),
+    groupId: text("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    postId: text("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    /** Most recent actor, plus everyone who contributed to this row. */
+    actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorIds: text("actor_ids").array().notNull().default(sql`'{}'::text[]`),
+    data: jsonb("data").$type<Record<string, string>>(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("notifications_user_recent_idx").on(t.userId, t.updatedAt.desc()),
+    uniqueIndex("notifications_unread_key_idx")
+      .on(t.userId, t.groupKey)
+      .where(sql`${t.readAt} is null`),
+  ],
 );
 
 // ─── Relations (for db.query.*) ──────────────────────────────────────────────

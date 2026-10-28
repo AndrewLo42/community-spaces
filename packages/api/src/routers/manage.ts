@@ -37,6 +37,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { requireGroupAction } from "../lib/access";
 import { removeComment, removePost } from "../lib/moderation";
+import { notify } from "../lib/notify";
 import { findPosts, toPostView } from "../lib/posts";
 import { protectedProcedure, router } from "../trpc";
 
@@ -112,6 +113,12 @@ export const manageRouter = router({
       await tx.update(memberships).set({ status: "active", requestMessage: null }).where(where);
       await tx.update(groups).set(adjustMemberCount(1)).where(eq(groups.id, input.groupId));
     });
+    await notify(ctx.db, [input.userId], {
+      type: "request_approved",
+      groupKey: `request:${input.groupId}`,
+      groupId: input.groupId,
+      actorId: ctx.user.id,
+    });
     return { ok: true };
   }),
 
@@ -164,6 +171,13 @@ export const manageRouter = router({
       .update(memberships)
       .set({ role: input.role })
       .where(and(eq(memberships.groupId, input.groupId), eq(memberships.userId, input.userId)));
+    await notify(ctx.db, [input.userId], {
+      type: "role_changed",
+      groupKey: `role:${input.groupId}`,
+      groupId: input.groupId,
+      actorId: ctx.user.id,
+      data: { role: input.role },
+    });
     return { ok: true };
   }),
 

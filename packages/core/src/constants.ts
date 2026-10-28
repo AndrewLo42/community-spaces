@@ -54,6 +54,24 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   other: "Something else",
 };
 
+/**
+ * Notifications are only for things addressed to you. New posts in your groups
+ * show up in the home feed and the email digest, never as notifications.
+ */
+export const NOTIFICATION_TYPES = [
+  "comment", // on your post
+  "reply", // to your comment
+  "post_approved",
+  "post_declined",
+  "request_approved",
+  "role_changed",
+  "mod_queue", // moderators: requests, pending posts or reports to look at
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const EMAIL_DIGEST_OPTIONS = ["daily", "weekly", "off"] as const;
+export type EmailDigest = (typeof EMAIL_DIGEST_OPTIONS)[number];
+
 export const ROLE_LABELS: Record<MemberRole, string> = {
   member: "Member",
   moderator: "Moderator",

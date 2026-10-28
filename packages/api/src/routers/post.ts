@@ -17,6 +17,7 @@ import { and, eq, inArray, memberships, postImages, posts } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadGroupAccess, loadPostAccess } from "../lib/access";
 import { removePost } from "../lib/moderation";
+import { notify, notifyModQueue } from "../lib/notify";
 import { afterCursor, FEED_PAGE_SIZE, findPosts, paginate, toPostView } from "../lib/posts";
 import { userUploadPrefix } from "../storage";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
@@ -134,6 +135,7 @@ export const postRouter = router({
       }
       return created!;
     });
+    if (status === "pending") await notifyModQueue(ctx.db, input.groupId, ctx.user.id);
     return { id: post.id, status };
   }),
 
@@ -165,6 +167,13 @@ export const postRouter = router({
       // Approved posts enter the feed as new, rather than buried at their draft time.
       .set(input.approve ? { status: "published", createdAt: new Date() } : { status: "removed" })
       .where(eq(posts.id, input.postId));
+    await notify(ctx.db, [post.authorId], {
+      type: input.approve ? "post_approved" : "post_declined",
+      groupKey: `review:${post.id}`,
+      groupId: post.groupId,
+      postId: post.id,
+      actorId: ctx.user.id,
+    });
     return { ok: true };
   }),
 });

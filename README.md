@@ -48,7 +48,7 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 |---|---|
 | `pnpm dev` | run the web app |
 | `pnpm typecheck` | typecheck every package |
-| `pnpm test` | run permission tests |
+| `pnpm test` | run permission and notification-wording tests |
 | `pnpm db:generate` | create a migration after editing `packages/db/src/schema.ts` |
 | `pnpm db:migrate` | apply migrations |
 | `pnpm db:studio` | browse the database |
@@ -57,9 +57,13 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 
 1. Create a Neon project and copy the **pooled** connection string.
 2. Import the repo on Vercel with root directory `apps/web`.
-3. Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`, `EMAIL_FROM`.
+3. Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`.
 4. Run `DATABASE_URL=… pnpm db:migrate` once against Neon.
 5. For photos: create an R2 bucket with public access, set the `R2_*` variables, and add a
    CORS rule allowing `PUT` from your site's origin (browsers upload straight to R2).
+
+6. Email digests run from a daily Vercel Cron (`apps/web/vercel.json`, 15:00 UTC). It handles both
+   daily and weekly subscribers. To try it locally:
+   `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`
 
 Vercel's Hobby plan is non-commercial. Move to Pro once the app makes money.

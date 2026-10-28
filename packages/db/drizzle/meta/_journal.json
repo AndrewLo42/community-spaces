@@ -22,6 +22,13 @@
       "when": 1793217471006,
       "tag": "0002_invites_and_report_details",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793219086294,
+      "tag": "0003_notifications",
+      "breakpoints": true
     }
   ]
 }

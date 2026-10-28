@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Avatar } from "@/components/avatar";
+import { NotificationBell } from "@/components/notification-bell";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ButtonLink } from "@/components/ui";
+import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
 import { Providers } from "@/trpc/client";
 import "./globals.css";
@@ -13,6 +16,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  const unread = user ? await (await serverApi()).notification.unreadCount() : 0;
 
   return (
     <html lang="en">
@@ -34,8 +38,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         New group
                       </ButtonLink>
                     </span>
-                    <ButtonLink href="/profile" variant="ghost" className="max-w-40 truncate">
-                      {user.name || "Profile"}
+                    <NotificationBell initialCount={unread} />
+                    <ButtonLink href="/profile" variant="ghost" className="px-2 sm:px-4" aria-label="Your profile">
+                      <span className="sm:hidden">
+                        <Avatar name={user.name || user.email} image={user.image} size="sm" />
+                      </span>
+                      <span className="hidden max-w-40 truncate sm:inline">{user.name || "Profile"}</span>
                     </ButtonLink>
                     <span className="hidden sm:contents">
                       <SignOutButton />

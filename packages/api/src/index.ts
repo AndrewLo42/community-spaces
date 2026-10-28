@@ -2,6 +2,7 @@ import { commentRouter } from "./routers/comment";
 import { groupRouter } from "./routers/group";
 import { inviteRouter } from "./routers/invite";
 import { manageRouter } from "./routers/manage";
+import { notificationRouter } from "./routers/notification";
 import { postRouter } from "./routers/post";
 import { reportRouter } from "./routers/report";
 import { userRouter } from "./routers/user";
@@ -15,6 +16,7 @@ export const appRouter = router({
   report: reportRouter,
   invite: inviteRouter,
   manage: manageRouter,
+  notification: notificationRouter,
 });
 
 export type AppRouter = typeof appRouter;
