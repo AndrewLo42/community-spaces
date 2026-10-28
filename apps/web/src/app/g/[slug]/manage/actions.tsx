@@ -1,6 +1,6 @@
 "use client";
 
-import { ROLE_LABELS, type MemberRole, type ReportTarget } from "@cs/core";
+import { ROLE_LABELS, type MemberRole, type PlaceSummary, type ReportTarget } from "@cs/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -316,7 +316,15 @@ export function InvitePanel({ groupId, invites }: { groupId: string; invites: In
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
-export function SettingsForm({ groupId, initial }: { groupId: string; initial: GroupSettings }) {
+export function SettingsForm({
+  groupId,
+  initial,
+  initialPlace,
+}: {
+  groupId: string;
+  initial: GroupSettings;
+  initialPlace: PlaceSummary | null;
+}) {
   const trpc = useTRPC();
   const onSuccess = useRefresh();
   const update = useMutation(trpc.manage.updateSettings.mutationOptions({ onSuccess }));
@@ -331,7 +339,7 @@ export function SettingsForm({ groupId, initial }: { groupId: string; initial: G
         update.mutate({ ...form, groupId });
       }}
     >
-      <GroupSettingsFields value={form} onChange={setForm} errors={errors} />
+      <GroupSettingsFields value={form} onChange={setForm} errors={errors} initialPlace={initialPlace} />
       <div className="flex items-center justify-end gap-3">
         {update.isSuccess && !update.isPending ? <span className="text-sm text-muted">Saved</span> : null}
         {update.error ? <span className="text-sm text-danger">{errorMessage(update.error)}</span> : null}

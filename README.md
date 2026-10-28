@@ -36,6 +36,7 @@ createdb community_spaces
 pnpm install
 cp .env.example .env          # then set BETTER_AUTH_SECRET (openssl rand -base64 32)
 pnpm db:migrate
+pnpm db:places                # US towns for locations (17k rows, ~3s)
 pnpm db:seed                  # optional sample groups
 pnpm dev                      # http://localhost:3000
 ```
@@ -51,6 +52,7 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 | `pnpm test` | run permission and notification-wording tests |
 | `pnpm db:generate` | create a migration after editing `packages/db/src/schema.ts` |
 | `pnpm db:migrate` | apply migrations |
+| `pnpm db:places` | load or refresh the US towns list |
 | `pnpm db:studio` | browse the database |
 
 ## Deploying (free tier)
@@ -58,7 +60,7 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 1. Create a Neon project and copy the **pooled** connection string.
 2. Import the repo on Vercel with root directory `apps/web`.
 3. Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`.
-4. Run `DATABASE_URL=… pnpm db:migrate` once against Neon.
+4. Run `DATABASE_URL=… pnpm db:migrate` and `DATABASE_URL=… pnpm db:places` once against Neon.
 5. For photos: create an R2 bucket with public access, set the `R2_*` variables, and add a
    CORS rule allowing `PUT` from your site's origin (browsers upload straight to R2).
 
@@ -69,3 +71,13 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
    To try one locally: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`
 
 Vercel's Hobby plan is non-commercial. Move to Pro once the app makes money.
+
+## Locations
+
+Groups and users pick a US town from `packages/db/data/us-places.tsv`: populated places
+with 1,000+ residents, trimmed from GeoNames `cities1000`. Search matches town names by prefix,
+and "near" searches filter by great-circle distance in SQL, so no geocoding service is needed.
+GeoNames data is [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); the site footer
+carries the required credit. To refresh the data, download `cities1000.zip` from
+https://download.geonames.org/export/dump/, keep rows where country is `US` and the feature
+class is `P`, write the same seven columns, then run `pnpm db:places`.

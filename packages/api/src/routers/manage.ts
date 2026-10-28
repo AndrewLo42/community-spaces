@@ -34,6 +34,7 @@ import {
   invites,
   isNull,
   memberships,
+  places,
   postImages,
   posts,
   reports,
@@ -45,6 +46,7 @@ import { TRPCError } from "@trpc/server";
 import { requireGroupAction } from "../lib/access";
 import { removeComment, removePost } from "../lib/moderation";
 import { notify } from "../lib/notify";
+import { assertPlace, foldPlace, getPlace } from "../lib/places";
 import { claimUploads, discardUploads } from "../lib/uploads";
 import { findPosts, toPostView } from "../lib/posts";
 import { containsPattern } from "../lib/search";
@@ -82,7 +84,11 @@ export const manageRouter = router({
     ]);
     const { searchVector: _sv, ...group } = access.group;
     return {
-      group: { ...group, bannerUrl: group.bannerKey ? ctx.storage.publicUrl(group.bannerKey) : null },
+      group: {
+        ...group,
+        bannerUrl: group.bannerKey ? ctx.storage.publicUrl(group.bannerKey) : null,
+        place: await getPlace(ctx.db, group.placeId),
+      },
       role: access.membership!.role,
       permissions: groupPermissions(access.permissionContext),
       counts: { requests: requests?.n ?? 0, pendingPosts: pendingPosts?.n ?? 0, openReports: openReports?.n ?? 0 },
@@ -101,11 +107,16 @@ export const manageRouter = router({
         bio: users.bio,
         message: memberships.requestMessage,
         requestedAt: memberships.createdAt,
+        placeId: places.id,
+        placeName: places.name,
+        placeState: places.state,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(places, eq(places.id, users.placeId))
       .where(and(eq(memberships.groupId, input.groupId), eq(memberships.status, "pending")))
-      .orderBy(asc(memberships.createdAt));
+      .orderBy(asc(memberships.createdAt))
+      .then((rows) => rows.map(foldPlace));
   }),
 
   reviewRequest: protectedProcedure.input(reviewRequestInput).mutation(async ({ ctx, input }) => {
@@ -146,9 +157,13 @@ export const manageRouter = router({
         role: memberships.role,
         status: memberships.status,
         joinedAt: memberships.createdAt,
+        placeId: places.id,
+        placeName: places.name,
+        placeState: places.state,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(places, eq(places.id, users.placeId))
       .where(
         and(
           eq(memberships.groupId, input.groupId),
@@ -160,6 +175,7 @@ export const manageRouter = router({
       .limit(MAX_MEMBERS_LISTED);
 
     return rows
+      .map(foldPlace)
       .map((m) => {
         const target = { userId: m.userId, role: m.role };
         const active = m.status === "active";
@@ -355,6 +371,7 @@ export const manageRouter = router({
 
   updateSettings: protectedProcedure.input(updateGroupInput).mutation(async ({ ctx, input }) => {
     await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:editSettings");
+    await assertPlace(ctx.db, input.placeId);
     const { groupId, ...settings } = input;
     await ctx.db.update(groups).set(settings).where(eq(groups.id, groupId));
     return { ok: true };

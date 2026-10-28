@@ -59,6 +59,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             ) : null}
           </header>
           <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+          <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-muted">
+            Town data from{" "}
+            <a href="https://www.geonames.org/" className="underline hover:text-fg" rel="noreferrer">
+              GeoNames
+            </a>
+            , licensed{" "}
+            <a href="https://creativecommons.org/licenses/by/4.0/" className="underline hover:text-fg" rel="noreferrer">
+              CC BY 4.0
+            </a>
+            .
+          </footer>
         </Providers>
       </body>
     </html>

@@ -1,13 +1,24 @@
-import { CATEGORY_LABELS, GROUP_CATEGORIES, type GroupCategory } from "@cs/core";
+import {
+  CATEGORY_LABELS,
+  DEFAULT_RADIUS_MILES,
+  GROUP_CATEGORIES,
+  placeLabel,
+  RADIUS_OPTIONS_MILES,
+  type GroupCategory,
+  type PlaceSummary,
+  type RadiusMiles,
+} from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GroupCard } from "@/components/group-card";
-import { Button, ButtonLink, cx, EmptyState, Input } from "@/components/ui";
+import { ButtonLink, cx, EmptyState } from "@/components/ui";
 import { serverApi } from "@/server/api";
+import { getSessionUser } from "@/server/auth";
+import { DiscoverSearchForm } from "./search-form";
 
 export const metadata: Metadata = { title: "Discover" };
 
-type SearchParams = Promise<{ q?: string; category?: string; cursor?: string }>;
+type SearchParams = Promise<{ q?: string; category?: string; cursor?: string; near?: string; radius?: string }>;
 
 export default async function DiscoverPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -16,18 +27,36 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
     ? (params.category as GroupCategory)
     : undefined;
   const cursor = Number(params.cursor) || 0;
+  const radius = (RADIUS_OPTIONS_MILES as readonly number[]).includes(Number(params.radius))
+    ? (Number(params.radius) as RadiusMiles)
+    : DEFAULT_RADIUS_MILES;
 
   const api = await serverApi();
-  const { groups, nextCursor } = await api.group.discover({ query, category, cursor });
+  // No ?near= means "near my town" when the viewer has set one; ?near=any means anywhere.
+  let near: PlaceSummary | null = null;
+  if (params.near && params.near !== "any") {
+    near = (await api.place.byId({ id: Number(params.near) }).catch(() => null)) ?? null;
+  } else if (!params.near && (await getSessionUser())) {
+    near = (await api.user.me())?.place ?? null;
+  }
+
+  const { groups, nextCursor } = await api.group.discover({ query, category, cursor, near: near?.id, radius });
 
   const href = (next: { category?: string; cursor?: number }) => {
     const sp = new URLSearchParams();
     if (query) sp.set("q", query);
     if (next.category) sp.set("category", next.category);
+    sp.set("near", near ? String(near.id) : "any");
+    if (near) sp.set("radius", String(radius));
     if (next.cursor) sp.set("cursor", String(next.cursor));
-    const s = sp.toString();
-    return s ? `/discover?${s}` : "/discover";
+    return `/discover?${sp}`;
   };
+  const anywhere = (() => {
+    const sp = new URLSearchParams({ near: "any" });
+    if (query) sp.set("q", query);
+    if (category) sp.set("category", category);
+    return `/discover?${sp}`;
+  })();
 
   return (
     <div className="space-y-6">
@@ -36,11 +65,16 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
         <p className="mt-1 text-sm text-muted">Find the people near you who care about the same things.</p>
       </div>
 
-      <form action="/discover" className="flex gap-2">
-        <Input name="q" defaultValue={query} placeholder="Search by name or topic: garden, running, books…" />
-        {category ? <input type="hidden" name="category" value={category} /> : null}
-        <Button type="submit">Search</Button>
-      </form>
+      <DiscoverSearchForm query={query} category={category} near={near} radius={radius} />
+
+      {near ? (
+        <p className="text-sm text-muted">
+          Groups within {radius} mi of <span className="font-medium text-fg">{placeLabel(near)}</span>, nearest first ·{" "}
+          <Link href={anywhere} className="underline hover:text-fg">
+            Search anywhere
+          </Link>
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <CategoryChip href={href({})} active={!category}>
@@ -54,8 +88,25 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
       </div>
 
       {groups.length === 0 ? (
-        <EmptyState title={query ? `No groups match "${query}"` : "No groups here yet"}>
-          <p>Can't find yours?</p>
+        <EmptyState
+          title={
+            near
+              ? `No groups${query ? ` matching "${query}"` : ""} within ${radius} mi of ${placeLabel(near)}`
+              : query
+                ? `No groups match "${query}"`
+                : "No groups here yet"
+          }
+        >
+          {near ? (
+            <p>
+              Try a wider distance, or{" "}
+              <Link href={anywhere} className="underline">
+                search anywhere
+              </Link>
+              . Groups without a location only show up in anywhere searches.
+            </p>
+          ) : null}
+          <p className="mt-2">Can't find yours?</p>
           <ButtonLink href="/groups/new" variant="secondary" className="mt-3">
             Start one
           </ButtonLink>

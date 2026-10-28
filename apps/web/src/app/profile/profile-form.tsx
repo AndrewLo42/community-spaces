@@ -1,13 +1,15 @@
 "use client";
 
+import type { PlaceSummary } from "@cs/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PlacePicker } from "@/components/place-picker";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { useTRPC } from "@/trpc/client";
 
-export function ProfileForm({ initial }: { initial: { name: string; bio: string } }) {
+export function ProfileForm({ initial }: { initial: { name: string; bio: string; place: PlaceSummary | null } }) {
   const router = useRouter();
   const trpc = useTRPC();
   const update = useMutation(trpc.user.updateProfile.mutationOptions({ onSuccess: () => router.refresh() }));
@@ -19,11 +21,18 @@ export function ProfileForm({ initial }: { initial: { name: string; bio: string 
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        update.mutate(form);
+        update.mutate({ name: form.name, bio: form.bio, placeId: form.place?.id ?? null });
       }}
     >
       <Field label="Name" error={errors.name}>
         <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Alex Rivera" />
+      </Field>
+      <Field
+        label="Town"
+        hint="Shown next to your name on posts, and used to suggest groups near you."
+        error={errors.placeId}
+      >
+        <PlacePicker value={form.place} onChange={(place) => setForm({ ...form, place })} ariaLabel="Your town" />
       </Field>
       <Field label="Short bio" hint={`${form.bio.length}/280`} error={errors.bio}>
         <Textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} maxLength={280} />

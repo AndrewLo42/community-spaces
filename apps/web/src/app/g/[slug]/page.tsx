@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, type GroupCategory } from "@cs/core";
+import { CATEGORY_LABELS, placeLabel, type GroupCategory } from "@cs/core";
 import { TRPCError } from "@trpc/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -113,6 +113,7 @@ export default async function GroupPage({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">
               {CATEGORY_LABELS[group.category as GroupCategory] ?? group.category}
+              {group.place ? ` · ${placeLabel(group.place)}` : ""}
               {group.visibility !== "public" ? ` · ${group.visibility}` : ""}
             </p>
             <h1 className="mt-1 font-serif text-3xl font-semibold tracking-tight">{group.name}</h1>

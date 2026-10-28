@@ -1,3 +1,4 @@
+import { placeLabel } from "@cs/core";
 import { TRPCError } from "@trpc/server";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -50,6 +51,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
           <h1 className="font-serif text-3xl font-semibold tracking-tight">{group.name}</h1>
           {group.description ? <p className="text-sm text-muted">{group.description}</p> : null}
           <p className="text-xs text-muted">
+            {group.place ? `${placeLabel(group.place)} · ` : ""}
             {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
           </p>
           <div className="flex justify-center pt-2">{action}</div>

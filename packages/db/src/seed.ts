@@ -1,7 +1,7 @@
 import { GROUP_ACCENTS, type GroupCategory } from "@cs/core";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { connect } from "./client";
-import { comments, groups, memberships, posts, users } from "./schema";
+import { comments, groups, memberships, places, posts, users } from "./schema";
 
 // Sample local communities so Discover isn't empty in dev. Safe to re-run.
 
@@ -166,6 +166,47 @@ for (const [slug, postsForGroup] of Object.entries(samplePosts)) {
     }
   }
   console.log(`  + posts in ${slug}`);
+}
+
+// Sample locations around Portland, OR. Only fills in places that are still
+// empty, so it never overwrites a location someone set. Needs `pnpm db:places`.
+const sampleLocations: { groups: Record<string, [string, string]>; users: Record<string, [string, string]> } = {
+  groups: {
+    "riverside-community-garden": ["Portland", "OR"],
+    "eastside-running-club": ["Gresham", "OR"],
+    "downtown-book-circle": ["Beaverton", "OR"],
+    "maple-street-neighbors": ["Vancouver", "WA"],
+  },
+  users: {
+    "maria@example.com": ["Portland", "OR"],
+    "dev@example.com": ["Gresham", "OR"],
+    "june@example.com": ["Beaverton", "OR"],
+  },
+};
+
+async function findPlaceId(name: string, state: string) {
+  const [place] = await db
+    .select({ id: places.id })
+    .from(places)
+    .where(and(eq(places.name, name), eq(places.state, state)))
+    .orderBy(desc(places.population))
+    .limit(1);
+  return place?.id ?? null;
+}
+
+const [anyPlace] = await db.select({ id: places.id }).from(places).limit(1);
+if (!anyPlace) {
+  console.log("  (no places loaded; run `pnpm db:places` to add sample locations)");
+} else {
+  for (const [slug, [name, state]] of Object.entries(sampleLocations.groups)) {
+    const placeId = await findPlaceId(name, state);
+    if (placeId) await db.update(groups).set({ placeId }).where(and(eq(groups.slug, slug), isNull(groups.placeId)));
+  }
+  for (const [email, [name, state]] of Object.entries(sampleLocations.users)) {
+    const placeId = await findPlaceId(name, state);
+    if (placeId) await db.update(users).set({ placeId }).where(and(eq(users.email, email), isNull(users.placeId)));
+  }
+  console.log("  + sample locations");
 }
 
 await close();

@@ -1,4 +1,5 @@
 import type { PostView } from "@cs/api";
+import { placeLabel } from "@cs/core";
 import Link from "next/link";
 import { timeAgo } from "@/lib/time";
 import { Avatar } from "./avatar";
@@ -23,7 +24,10 @@ export function PostCard({
       <header className="flex items-start gap-3">
         <Avatar name={post.author.name} image={post.author.image} />
         <div className="min-w-0 flex-1 text-sm">
-          <p className="font-medium leading-tight">{post.author.name || "Member"}</p>
+          <p className="leading-tight">
+            <span className="font-medium">{post.author.name || "Member"}</span>
+            {post.author.place ? <span className="text-xs text-muted"> · {placeLabel(post.author.place)}</span> : null}
+          </p>
           <p className="mt-0.5 text-xs text-muted">
             {showGroup ? (
               <>

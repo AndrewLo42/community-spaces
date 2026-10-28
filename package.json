@@ -10,7 +10,8 @@
     "db:generate": "pnpm --filter @cs/db generate",
     "db:migrate": "pnpm --filter @cs/db migrate",
     "db:seed": "pnpm --filter @cs/db seed",
-    "db:studio": "pnpm --filter @cs/db studio"
+    "db:studio": "pnpm --filter @cs/db studio",
+    "db:places": "pnpm --filter @cs/db places"
   },
   "devDependencies": {
     "turbo": "^2.11.10",

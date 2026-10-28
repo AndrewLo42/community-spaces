@@ -43,6 +43,13 @@
       "when": 1793224643114,
       "tag": "0005_digest_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793227377806,
+      "tag": "0006_places",
+      "breakpoints": true
     }
   ]
 }

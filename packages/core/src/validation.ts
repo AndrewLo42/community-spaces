@@ -16,6 +16,7 @@ import {
   UPLOAD_PURPOSES,
   type MemberRole,
 } from "./constants";
+import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS_MILES, type RadiusMiles } from "./places";
 
 export const slugSchema = z
   .string()
@@ -35,6 +36,8 @@ export function slugify(name: string): string {
     .replace(/-+$/, "");
 }
 
+export const placeIdSchema = z.number().int().positive();
+
 export const groupSettingsInput = z
   .object({
     name: z.string().trim().min(3, "At least 3 characters").max(80),
@@ -46,6 +49,8 @@ export const groupSettingsInput = z
     joinPolicy: z.enum(JOIN_POLICIES).default("open"),
     postPolicy: z.enum(POST_POLICIES).default("members"),
     commentPolicy: z.enum(COMMENT_POLICIES).default("members"),
+    /** null = no location (online groups). */
+    placeId: placeIdSchema.nullable().default(null),
   })
   .refine((g) => g.visibility !== "hidden" || g.joinPolicy === "invite", {
     message: "Hidden groups can only be joined by invite",
@@ -58,6 +63,9 @@ export type CreateGroupInput = z.infer<typeof createGroupInput>;
 export const discoverGroupsInput = z.object({
   query: z.string().trim().max(100).optional(),
   category: z.enum(GROUP_CATEGORIES).optional(),
+  /** Only groups within `radius` miles of this place, nearest first. */
+  near: placeIdSchema.optional(),
+  radius: z.union(RADIUS_OPTIONS_MILES.map((r) => z.literal(r)) as [z.ZodLiteral<RadiusMiles>, ...z.ZodLiteral<RadiusMiles>[]]).default(DEFAULT_RADIUS_MILES),
   cursor: z.number().int().min(0).default(0),
 });
 
@@ -69,7 +77,11 @@ export const joinGroupInput = z.object({
 export const updateProfileInput = z.object({
   name: z.string().trim().min(1, "Tell people what to call you").max(60),
   bio: z.string().trim().max(280).default(""),
+  /** Hometown, shown next to your name. null clears it; leaving it out keeps the current one. */
+  placeId: placeIdSchema.nullable().optional(),
 });
+
+export const placeSearchInput = z.object({ query: z.string().trim().min(1).max(80) });
 
 export const createUploadInput = z.object({
   purpose: z.enum(UPLOAD_PURPOSES).default("post"),

@@ -11,7 +11,10 @@ export function findPosts(db: Db, where: SQL | undefined, limit?: number) {
     limit,
     orderBy: [desc(posts.createdAt), desc(posts.id)],
     with: {
-      author: { columns: { id: true, name: true, image: true } },
+      author: {
+        columns: { id: true, name: true, image: true },
+        with: { place: { columns: { id: true, name: true, state: true } } },
+      },
       images: {
         columns: { storageKey: true, width: true, height: true },
         orderBy: (t, { asc }) => [asc(t.position)],

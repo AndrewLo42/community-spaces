@@ -25,7 +25,7 @@ export default async function ProfilePage() {
         <AvatarField name={me.name} image={me.image} />
       </div>
       <div className="mt-6">
-        <ProfileForm initial={{ name: me.name, bio: me.bio }} />
+        <ProfileForm initial={{ name: me.name, bio: me.bio, place: me.place }} />
       </div>
       <div className="mt-10 border-t border-line pt-6">
         <DigestForm initial={prefs.emailDigest} />

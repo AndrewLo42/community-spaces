@@ -8,8 +8,11 @@ import {
   type CreateGroupInput,
   type GroupVisibility,
   type JoinPolicy,
+  type PlaceSummary,
   type PostPolicy,
 } from "@cs/core";
+import { useState } from "react";
+import { PlacePicker } from "./place-picker";
 import { cx, Field, Input, Select, Textarea } from "./ui";
 
 /** Everything about a group except its address. Shared by create and settings. */
@@ -49,14 +52,18 @@ export function GroupSettingsFields<T extends GroupSettings>({
   onChange,
   errors,
   afterName,
+  initialPlace = null,
 }: {
   value: T;
   onChange: (next: T) => void;
   errors: Record<string, string | undefined>;
   /** Slot under the name field (the create form puts the web address here). */
   afterName?: React.ReactNode;
+  /** The saved location, so the picker can show its name. */
+  initialPlace?: PlaceSummary | null;
 }) {
   const set = <K extends keyof GroupSettings>(key: K, v: T[K]) => onChange({ ...value, [key]: v });
+  const [place, setPlace] = useState<PlaceSummary | null>(initialPlace);
 
   return (
     <div className="space-y-8">
@@ -77,6 +84,21 @@ export function GroupSettingsFields<T extends GroupSettings>({
 
         <Field label="Group rules" hint="Shown on the About tab. Optional." error={errors.rules}>
           <Textarea value={value.rules} onChange={(e) => set("rules", e.target.value)} />
+        </Field>
+
+        <Field
+          label="Where does the group meet?"
+          hint="Helps neighbors find you. Leave empty for online-only groups."
+          error={errors.placeId}
+        >
+          <PlacePicker
+            value={place}
+            ariaLabel="Group location"
+            onChange={(p) => {
+              setPlace(p);
+              set("placeId", p?.id ?? null);
+            }}
+          />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">

@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, type GroupCategory } from "@cs/core";
+import { CATEGORY_LABELS, formatDistance, placeLabel, type GroupCategory, type PlaceSummary } from "@cs/core";
 import Link from "next/link";
 
 export interface GroupCardData {
@@ -10,6 +10,9 @@ export interface GroupCardData {
   bannerUrl: string | null;
   visibility: "public" | "private" | "hidden";
   memberCount: number;
+  place?: PlaceSummary | null;
+  /** Present when searching near a town. */
+  distanceMiles?: number | null;
 }
 
 export function GroupCard({
@@ -34,6 +37,14 @@ export function GroupCard({
       <div className="space-y-2 p-4">
         <h3 className="font-serif text-lg font-semibold leading-snug group-hover:underline">{group.name}</h3>
         <p className="line-clamp-2 text-sm text-muted">{group.description || "No description yet."}</p>
+        {group.place ? (
+          <p className="text-xs font-medium text-fg">
+            {placeLabel(group.place)}
+            {group.distanceMiles != null ? (
+              <span className="font-normal text-muted"> · {formatDistance(group.distanceMiles)} away</span>
+            ) : null}
+          </p>
+        ) : null}
         <p className="text-xs text-muted">
           {CATEGORY_LABELS[group.category as GroupCategory] ?? group.category} ·{" "}
           {group.memberCount} {group.memberCount === 1 ? "member" : "members"}

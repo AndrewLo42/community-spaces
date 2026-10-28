@@ -1,4 +1,4 @@
-import { REPORT_REASON_LABELS, ROLE_LABELS, type ReportReason } from "@cs/core";
+import { placeLabel, REPORT_REASON_LABELS, ROLE_LABELS, type ReportReason } from "@cs/core";
 import { TRPCError } from "@trpc/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -120,7 +120,9 @@ export default async function ManagePage({
                 joinPolicy: group.joinPolicy,
                 postPolicy: group.postPolicy,
                 commentPolicy: group.commentPolicy,
+                placeId: group.place?.id ?? null,
               }}
+              initialPlace={group.place}
             />
             {overview.role === "owner" ? <OwnerDangerZone groupId={groupId} groupName={group.name} /> : null}
           </>
@@ -143,7 +145,9 @@ async function RequestsTab({ groupId }: { groupId: string }) {
             <div className="min-w-0 flex-1 text-sm">
               <p className="font-medium">
                 {r.name || "Unnamed member"}
-                <span className="ml-2 text-xs font-normal text-muted">asked {timeAgo(r.requestedAt)}</span>
+                <span className="ml-2 text-xs font-normal text-muted">
+                  {r.place ? `${placeLabel(r.place)} · ` : ""}asked {timeAgo(r.requestedAt)}
+                </span>
               </p>
               {r.bio ? <p className="mt-0.5 text-muted">{r.bio}</p> : null}
               {r.message ? <p className="mt-2 rounded-md bg-surface-2 px-3 py-2">“{r.message}”</p> : null}
@@ -255,7 +259,8 @@ async function MembersTab({ groupId, slug, query }: { groupId: string; slug: str
                   {m.isSelf ? <span className="ml-1 font-normal text-muted">(you)</span> : null}
                 </p>
                 <p className="text-xs text-muted">
-                  {ROLE_LABELS[m.role]} · joined {timeAgo(m.joinedAt)}
+                  {ROLE_LABELS[m.role]}
+                  {m.place ? ` · ${placeLabel(m.place)}` : ""} · joined {timeAgo(m.joinedAt)}
                 </p>
               </div>
             </div>

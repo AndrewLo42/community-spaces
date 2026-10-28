@@ -2,6 +2,7 @@ import { canAcceptInvite, inviteCodeInput } from "@cs/core";
 import { and, eq, groups, gt, invites, isNull, lt, memberships, or, sql, type Db } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadGroupAccess } from "../lib/access";
+import { getPlace } from "../lib/places";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 async function findInvite(db: Db, code: string) {
@@ -33,6 +34,7 @@ export const inviteRouter = router({
         description: group.description,
         accentColor: group.accentColor,
         bannerUrl: group.bannerKey ? ctx.storage.publicUrl(group.bannerKey) : null,
+        place: await getPlace(ctx.db, group.placeId),
         memberCount: group.memberCount,
         visibility: group.visibility,
       },

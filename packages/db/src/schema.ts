@@ -16,6 +16,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   customType,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -45,6 +46,33 @@ const tsvector = customType<{ data: string }>({
   dataType: () => "tsvector",
 });
 
+// ─── Places ──────────────────────────────────────────────────────────────────
+
+/**
+ * US cities and towns (GeoNames "cities1000", CC BY 4.0), loaded by
+ * `pnpm db:places`. Groups and users point at a place, so search can match
+ * by name and by distance without any outside service.
+ */
+export const places = pgTable(
+  "places",
+  {
+    /** The GeoNames id, so reloading the list updates rows in place. */
+    id: integer("id").primaryKey(),
+    name: text("name").notNull(),
+    asciiName: text("ascii_name").notNull(),
+    /** Two-letter state code, e.g. "OR". */
+    state: text("state").notNull(),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    population: integer("population").notNull().default(0),
+  },
+  (t) => [
+    // Prefix search: lower(ascii_name) LIKE 'port%'
+    index("places_name_prefix_idx").using("btree", sql`lower(${t.asciiName}) text_pattern_ops`),
+    index("places_lat_lng_idx").on(t.lat, t.lng),
+  ],
+);
+
 // ─── Auth (shape required by Better Auth) ────────────────────────────────────
 
 export const emailDigest = pgEnum("email_digest", EMAIL_DIGEST_OPTIONS);
@@ -57,6 +85,8 @@ export const users = pgTable("users", {
   /** Public URL (Better Auth's field); imageKey is the stored object behind it, if we host it. */
   image: text("image"),
   imageKey: text("image_key"),
+  /** Hometown, shown next to the user's name. Optional. */
+  placeId: integer("place_id").references(() => places.id, { onDelete: "set null" }),
   bio: text("bio").notNull().default(""),
   /** Opt-in: nobody gets summary emails until they choose daily or weekly. */
   emailDigest: emailDigest("email_digest").notNull().default("off"),
@@ -145,6 +175,8 @@ export const groups = pgTable(
     // Denormalized so discovery and group headers never COUNT(*).
     memberCount: integer("member_count").notNull().default(0),
     createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Where the group meets. Optional: online-only groups leave it empty. */
+    placeId: integer("place_id").references(() => places.id, { onDelete: "set null" }),
     searchVector: tsvector("search_vector").generatedAlwaysAs(
       sql`setweight(to_tsvector('english', coalesce("name", '')), 'A') || setweight(to_tsvector('english', coalesce("description", '')), 'B')`,
     ),
@@ -344,12 +376,14 @@ export const notifications = pgTable(
 
 // ─── Relations (for db.query.*) ──────────────────────────────────────────────
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
+  place: one(places, { fields: [users.placeId], references: [places.id] }),
   memberships: many(memberships),
   posts: many(posts),
 }));
 
 export const groupsRelations = relations(groups, ({ many, one }) => ({
+  place: one(places, { fields: [groups.placeId], references: [places.id] }),
   memberships: many(memberships),
   posts: many(posts),
   createdBy: one(users, { fields: [groups.createdById], references: [users.id] }),
