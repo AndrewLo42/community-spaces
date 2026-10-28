@@ -36,6 +36,13 @@
       "when": 1793224195974,
       "tag": "0004_uploads_and_avatars",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793224643114,
+      "tag": "0005_digest_opt_in",
+      "breakpoints": true
     }
   ]
 }

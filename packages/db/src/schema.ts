@@ -58,7 +58,8 @@ export const users = pgTable("users", {
   image: text("image"),
   imageKey: text("image_key"),
   bio: text("bio").notNull().default(""),
-  emailDigest: emailDigest("email_digest").notNull().default("weekly"),
+  /** Opt-in: nobody gets summary emails until they choose daily or weekly. */
+  emailDigest: emailDigest("email_digest").notNull().default("off"),
   /** When this user's digest window last closed (sent, or checked with nothing to say). */
   lastDigestAt: timestamp("last_digest_at", { withTimezone: true }),
   ...timestamps,

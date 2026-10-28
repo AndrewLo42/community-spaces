@@ -84,7 +84,7 @@ export const notificationRouter = router({
       .select({ emailDigest: users.emailDigest })
       .from(users)
       .where(eq(users.id, ctx.user.id));
-    return { emailDigest: row?.emailDigest ?? "weekly" };
+    return { emailDigest: row?.emailDigest ?? "off" };
   }),
 
   updatePreferences: protectedProcedure.input(updatePreferencesInput).mutation(async ({ ctx, input }) => {
