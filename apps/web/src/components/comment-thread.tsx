@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/errors";
 import { timeAgo } from "@/lib/time";
 import { useTRPC } from "@/trpc/client";
 import { Avatar } from "./avatar";
+import { ReportDialog } from "./report-dialog";
 import { Button, Textarea } from "./ui";
 
 export interface CommentData {
@@ -17,6 +18,7 @@ export interface CommentData {
   body: string | null;
   author: { id: string; name: string; image: string | null } | null;
   canRemove: boolean;
+  canReport: boolean;
 }
 
 export function CommentThread({
@@ -89,6 +91,7 @@ function Comment({
   const trpc = useTRPC();
   const remove = useMutation(trpc.comment.remove.mutationOptions({ onSuccess: () => router.refresh() }));
   const [replying, setReplying] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   if (comment.removed) {
     return <p className="text-sm italic text-muted">This comment was removed.</p>;
@@ -120,7 +123,15 @@ function Comment({
               Remove
             </button>
           ) : null}
+          {comment.canReport ? (
+            <button className="hover:text-fg" onClick={() => setReporting(true)}>
+              Report
+            </button>
+          ) : null}
         </div>
+        {reporting ? (
+          <ReportDialog targetType="comment" targetId={comment.id} onClose={() => setReporting(false)} />
+        ) : null}
         {replying ? (
           <div className="mt-2">
             <CommentForm

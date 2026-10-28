@@ -1,6 +1,9 @@
 import { commentRouter } from "./routers/comment";
 import { groupRouter } from "./routers/group";
+import { inviteRouter } from "./routers/invite";
+import { manageRouter } from "./routers/manage";
 import { postRouter } from "./routers/post";
+import { reportRouter } from "./routers/report";
 import { userRouter } from "./routers/user";
 import { createCallerFactory, router } from "./trpc";
 
@@ -9,6 +12,9 @@ export const appRouter = router({
   group: groupRouter,
   post: postRouter,
   comment: commentRouter,
+  report: reportRouter,
+  invite: inviteRouter,
+  manage: manageRouter,
 });
 
 export type AppRouter = typeof appRouter;

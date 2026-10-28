@@ -8,7 +8,11 @@ import {
   JOIN_POLICIES,
   MAX_IMAGE_BYTES,
   MAX_POST_IMAGES,
+  MEMBER_ROLES,
   POST_POLICIES,
+  REPORT_REASONS,
+  REPORT_TARGETS,
+  type MemberRole,
 } from "./constants";
 
 export const slugSchema = z
@@ -103,3 +107,39 @@ export const createCommentInput = z.object({
 });
 
 export const commentIdInput = z.object({ commentId: z.string().min(1) });
+
+// ─── Group management ────────────────────────────────────────────────────────
+
+export const groupIdInput = z.object({ groupId: z.string().min(1) });
+export const memberTargetInput = groupIdInput.extend({ userId: z.string().min(1) });
+export const reviewRequestInput = memberTargetInput.extend({ approve: z.boolean() });
+export const removeMemberInput = memberTargetInput.extend({ ban: z.boolean() });
+/** Ownership moves through a separate transfer flow, never a role change. */
+export const setRoleInput = memberTargetInput.extend({
+  role: z.enum(MEMBER_ROLES.filter((r) => r !== "owner") as [MemberRole, ...MemberRole[]]),
+});
+
+export const updateGroupInput = groupSettingsInput.and(groupIdInput);
+export type UpdateGroupInput = z.infer<typeof updateGroupInput>;
+
+export const createReportInput = z.object({
+  targetType: z.enum(REPORT_TARGETS),
+  targetId: z.string().min(1),
+  reason: z.enum(REPORT_REASONS),
+  details: z.string().trim().max(1000).default(""),
+});
+
+export const resolveReportInput = groupIdInput.extend({
+  targetType: z.enum(REPORT_TARGETS),
+  targetId: z.string().min(1),
+  action: z.enum(["remove", "dismiss"]),
+});
+
+export const INVITE_EXPIRY_DAYS = [1, 7, 30] as const;
+export const createInviteInput = groupIdInput.extend({
+  /** null = never expires */
+  expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30), z.null()]).default(7),
+  maxUses: z.number().int().positive().max(1000).nullable().default(null),
+});
+export const inviteCodeInput = z.object({ code: z.string().trim().min(1).max(64) });
+export const inviteIdInput = groupIdInput.extend({ inviteId: z.string().min(1) });

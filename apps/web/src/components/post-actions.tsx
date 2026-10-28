@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTRPC } from "@/trpc/client";
+import { ReportDialog } from "./report-dialog";
 import { Button } from "./ui";
 
 export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "pinned" | "locked" | "viewer"> }) {
@@ -27,7 +28,8 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  const { canModerate, canRemove } = post.viewer;
+  const [reporting, setReporting] = useState(false);
+  const { canModerate, canRemove, canReport } = post.viewer;
   const postId = post.id;
 
   if (post.status === "pending" && canModerate) {
@@ -48,7 +50,7 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
     );
   }
 
-  if (!canModerate && !canRemove) return null;
+  if (!canModerate && !canRemove && !canReport) return null;
 
   const items: Array<{ label: string; run: () => void; danger?: boolean }> = [];
   if (canModerate && post.status === "published") {
@@ -58,6 +60,7 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
       run: () => lock.mutate({ postId, value: !post.locked }),
     });
   }
+  if (canReport) items.push({ label: "Report", run: () => setReporting(true) });
   if (canRemove) {
     items.push({
       label: post.status === "pending" ? "Withdraw post" : "Remove post",
@@ -90,6 +93,7 @@ export function PostActions({ post }: { post: Pick<PostView, "id" | "status" | "
           ))}
         </div>
       ) : null}
+      {reporting ? <ReportDialog targetType="post" targetId={postId} onClose={() => setReporting(false)} /> : null}
     </div>
   );
 }

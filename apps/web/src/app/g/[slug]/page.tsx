@@ -26,6 +26,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: group.name, description: group.description };
 }
 
+async function needsAttention(groupId: string) {
+  const { counts } = await (await serverApi()).manage.overview({ groupId });
+  return counts.requests + counts.pendingPosts + counts.openReports;
+}
+
 async function GroupFeed({
   groupId,
   slug,
@@ -93,6 +98,7 @@ export default async function GroupPage({
   const { slug } = await params;
   const { cursor } = await searchParams;
   const [{ group, membership, permissions }, user] = await Promise.all([loadGroup(slug), getSessionUser()]);
+  const attention = permissions.manage ? await needsAttention(group.id) : 0;
 
   return (
     <div className="space-y-6">
@@ -110,14 +116,21 @@ export default async function GroupPage({
               {membership?.status === "active" && membership.role !== "member" ? ` · You're ${membership.role === "owner" ? "the owner" : `a ${membership.role}`}` : ""}
             </p>
           </div>
-          <MembershipButton
-            groupId={group.id}
-            signedIn={!!user}
-            status={membership?.status ?? null}
-            canJoin={permissions.join}
-            canRequest={permissions.requestJoin}
-            canLeave={permissions.leave}
-          />
+          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+            {permissions.manage ? (
+              <ButtonLink href={`/g/${group.slug}/manage`} variant="secondary">
+                Manage{attention > 0 ? ` · ${attention} to review` : ""}
+              </ButtonLink>
+            ) : null}
+            <MembershipButton
+              groupId={group.id}
+              signedIn={!!user}
+              status={membership?.status ?? null}
+              canJoin={permissions.join}
+              canRequest={permissions.requestJoin}
+              canLeave={permissions.leave}
+            />
+          </div>
         </div>
       </Card>
 

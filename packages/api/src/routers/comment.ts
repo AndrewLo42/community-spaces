@@ -1,7 +1,8 @@
-import { canCommentOnPost, canRemoveContent, canViewPost, commentIdInput, createCommentInput, postIdInput } from "@cs/core";
+import { canCommentOnPost, canRemoveContent, canReport, canViewPost, commentIdInput, createCommentInput, postIdInput } from "@cs/core";
 import { and, asc, comments, eq, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadPostAccess } from "../lib/access";
+import { removeComment } from "../lib/moderation";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const MAX_COMMENTS = 500;
@@ -30,6 +31,7 @@ export const commentRouter = router({
         body: removed ? null : c.body,
         author: removed ? null : c.author,
         canRemove: !removed && canRemoveContent(access.permissionContext, c),
+        canReport: !removed && canReport(access.permissionContext, c),
       };
     });
   }),
@@ -74,13 +76,7 @@ export const commentRouter = router({
     const access = await loadPostAccess(ctx.db, comment.postId, ctx.user.id);
     if (!access || !canRemoveContent(access.permissionContext, comment)) throw new TRPCError({ code: "FORBIDDEN" });
 
-    await ctx.db.transaction(async (tx) => {
-      await tx.update(comments).set({ status: "removed" }).where(eq(comments.id, input.commentId));
-      await tx
-        .update(posts)
-        .set({ commentCount: sql`${posts.commentCount} - 1` })
-        .where(eq(posts.id, comment.postId));
-    });
+    await removeComment(ctx.db, comment);
     return { ok: true };
   }),
 });

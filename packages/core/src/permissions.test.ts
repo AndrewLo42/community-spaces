@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 import type { MemberRole, MembershipStatus } from "./constants";
 import {
   can,
+  canAcceptInvite,
   canChangeRole,
   canCommentOnPost,
+  canModerateMember,
+  canReport,
   canRemoveContent,
   canViewPost,
   type GroupRules,
@@ -141,6 +144,23 @@ describe("commenting", () => {
   });
 });
 
+describe("reports and invites", () => {
+  it("readers can report others' content but not their own", () => {
+    assert.equal(canReport(ctx({}, null, "reader"), { authorId: "author" }), true);
+    assert.equal(canReport(ctx({}, { role: "member" }, "author"), { authorId: "author" }), false);
+    assert.equal(canReport(ctx({}, null, null), { authorId: "author" }), false);
+    assert.equal(canReport(ctx({ visibility: "private" }, null, "reader"), { authorId: "author" }), false);
+  });
+
+  it("invites work on any join policy and upgrade pending requests, but not bans", () => {
+    assert.equal(canAcceptInvite(ctx({ joinPolicy: "invite", visibility: "hidden" })), true);
+    assert.equal(canAcceptInvite(ctx({}, { role: "member", status: "pending" })), true);
+    assert.equal(canAcceptInvite(ctx({}, { role: "member", status: "banned" })), false);
+    assert.equal(canAcceptInvite(ctx({}, { role: "member" })), false);
+    assert.equal(canAcceptInvite(ctx({}, null, null)), false);
+  });
+});
+
 describe("viewing posts", () => {
   const published = { authorId: "author", status: "published" as const };
   const pending = { authorId: "author", status: "pending" as const };
@@ -168,6 +188,24 @@ describe("moderation", () => {
     assert.equal(canRemoveContent(ctx({}, { role: "member" }, "author"), post), true);
     assert.equal(canRemoveContent(ctx({}, { role: "member" }, "someone"), post), false);
     assert.equal(canRemoveContent(ctx({}, { role: "moderator" }, "mod"), post), true);
+  });
+
+  it("members can be removed only by someone who outranks them, never by themselves", () => {
+    const member = { userId: "m", role: "member" as const };
+    const moderator = { userId: "mod2", role: "moderator" as const };
+    assert.equal(canModerateMember(ctx({}, { role: "moderator" }, "mod"), member), true);
+    assert.equal(canModerateMember(ctx({}, { role: "moderator" }, "mod"), moderator), false);
+    assert.equal(canModerateMember(ctx({}, { role: "admin" }, "a"), moderator), true);
+    assert.equal(canModerateMember(ctx({}, { role: "admin" }, "a"), { userId: "o", role: "owner" }), false);
+    assert.equal(canModerateMember(ctx({}, { role: "owner" }, "o"), { userId: "o", role: "owner" }), false);
+    assert.equal(canModerateMember(ctx({}, { role: "member" }, "x"), member), false);
+  });
+
+  it("only admins and the owner manage invites; moderators open the manage page", () => {
+    assert.equal(can(ctx({}, { role: "moderator" }), "invite:manage"), false);
+    assert.equal(can(ctx({}, { role: "admin" }), "invite:manage"), true);
+    assert.equal(can(ctx({}, { role: "moderator" }), "group:manage"), true);
+    assert.equal(can(ctx({}, { role: "member" }), "group:manage"), false);
   });
 
   it("role changes require outranking both the target and the new role", () => {

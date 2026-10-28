@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, Field, Input } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
 
-export function SignInForm({ devHint }: { devHint: boolean }) {
+export function SignInForm({ devHint, callbackURL }: { devHint: boolean; callbackURL: string }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function SignInForm({ devHint }: { devHint: boolean }) {
         e.preventDefault();
         setState("sending");
         setError(null);
-        const { error } = await authClient.signIn.magicLink({ email, callbackURL: "/" });
+        const { error } = await authClient.signIn.magicLink({ email, callbackURL });
         if (error) {
           setError(error.message ?? "Couldn't send the link");
           setState("idle");

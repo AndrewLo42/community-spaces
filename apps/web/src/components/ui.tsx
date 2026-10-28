@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { ComponentProps } from "react";
+import { twMerge } from "tailwind-merge";
 
 // Small set of primitives. Swap for shadcn/ui once the UI grows.
 
+/** Joins classes; later Tailwind classes override conflicting earlier ones (e.g. a caller's w-auto beats w-full). */
 export function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+  return twMerge(classes.filter(Boolean).join(" "));
 }
 
 const buttonVariants = {
@@ -58,7 +60,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="block text-sm font-medium">{label}</span>
       {children}
       {error ? <span className="block text-xs text-danger">{error}</span> : null}
       {!error && hint ? <span className="block text-xs text-muted">{hint}</span> : null}

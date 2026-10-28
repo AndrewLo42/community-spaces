@@ -1,5 +1,6 @@
-import type { PermissionContext } from "@cs/core";
+import { can, type GroupAction, type PermissionContext } from "@cs/core";
 import { and, eq, groups, memberships, posts, type Db } from "@cs/db";
+import { TRPCError } from "@trpc/server";
 
 /** Loads a group plus the viewer's membership, ready for `can()`. */
 export async function loadGroupAccess(db: Db, where: { id: string } | { slug: string }, userId: string | null) {
@@ -18,6 +19,13 @@ export async function loadGroupAccess(db: Db, where: { id: string } | { slug: st
 
   const permissionContext: PermissionContext = { userId, group, membership: membership ?? null };
   return { group, membership: membership ?? null, permissionContext };
+}
+
+/** Loads the group and throws FORBIDDEN unless the viewer may perform `action`. */
+export async function requireGroupAction(db: Db, groupId: string, userId: string, action: GroupAction) {
+  const access = await loadGroupAccess(db, { id: groupId }, userId);
+  if (!access || !can(access.permissionContext, action)) throw new TRPCError({ code: "FORBIDDEN" });
+  return access;
 }
 
 /** Loads a post along with its group's access context. */

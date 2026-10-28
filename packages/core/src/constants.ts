@@ -43,6 +43,24 @@ export type ReportTarget = (typeof REPORT_TARGETS)[number];
 export const REPORT_STATUSES = ["open", "resolved", "dismissed"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
+export const REPORT_REASONS = ["spam", "harassment", "inappropriate", "off-topic", "other"] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  spam: "Spam or advertising",
+  harassment: "Harassment or hate",
+  inappropriate: "Inappropriate content",
+  "off-topic": "Off-topic for this group",
+  other: "Something else",
+};
+
+export const ROLE_LABELS: Record<MemberRole, string> = {
+  member: "Member",
+  moderator: "Moderator",
+  admin: "Admin",
+  owner: "Owner",
+};
+
 export const GROUP_CATEGORIES = [
   "neighborhood",
   "hobbies",

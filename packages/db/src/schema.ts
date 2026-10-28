@@ -246,11 +246,34 @@ export const reports = pgTable(
     targetType: reportTarget("target_type").notNull(),
     targetId: text("target_id").notNull(),
     reason: text("reason").notNull(),
+    details: text("details").notNull().default(""),
     status: reportStatus("status").notNull().default("open"),
     resolvedById: text("resolved_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
-  (t) => [index("reports_group_status_idx").on(t.groupId, t.status, t.createdAt)],
+  (t) => [
+    index("reports_group_status_idx").on(t.groupId, t.status, t.createdAt),
+    index("reports_target_idx").on(t.targetType, t.targetId, t.status),
+  ],
+);
+
+/** Shareable join links. The only way into invite-only and hidden groups. */
+export const invites = pgTable(
+  "invites",
+  {
+    id: id(),
+    code: text("code").notNull().unique(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    uses: integer("uses").notNull().default(0),
+    maxUses: integer("max_uses"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("invites_group_idx").on(t.groupId)],
 );
 
 // ─── Relations (for db.query.*) ──────────────────────────────────────────────

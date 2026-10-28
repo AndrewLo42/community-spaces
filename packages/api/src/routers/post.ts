@@ -16,6 +16,7 @@ import {
 import { and, eq, inArray, memberships, postImages, posts } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadGroupAccess, loadPostAccess } from "../lib/access";
+import { removePost } from "../lib/moderation";
 import { afterCursor, FEED_PAGE_SIZE, findPosts, paginate, toPostView } from "../lib/posts";
 import { userUploadPrefix } from "../storage";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
@@ -139,7 +140,7 @@ export const postRouter = router({
   remove: protectedProcedure.input(postIdInput).mutation(async ({ ctx, input }) => {
     const access = await loadPostAccess(ctx.db, input.postId, ctx.user.id);
     if (!access || !canRemoveContent(access.permissionContext, access.post)) throw new TRPCError({ code: "FORBIDDEN" });
-    await ctx.db.update(posts).set({ status: "removed" }).where(eq(posts.id, input.postId));
+    await removePost(ctx.db, input.postId);
     return { ok: true };
   }),
 

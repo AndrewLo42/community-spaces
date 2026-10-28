@@ -15,6 +15,13 @@
       "when": 1793211830310,
       "tag": "0001_post_cursor_precision",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793217471006,
+      "tag": "0002_invites_and_report_details",
+      "breakpoints": true
     }
   ]
 }

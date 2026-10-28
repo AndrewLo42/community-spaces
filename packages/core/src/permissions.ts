@@ -46,7 +46,10 @@ export type GroupAction =
   | "post:moderate" // pin, lock, remove, approve
   | "comment:create"
   | "member:review" // approve / reject join requests
-  | "member:ban";
+  | "member:ban"
+  | "report:review"
+  | "invite:manage"
+  | "group:manage"; // can open the manage page at all
 
 export function roleRank(role: MemberRole): number {
   return MEMBER_ROLES.indexOf(role);
@@ -103,8 +106,39 @@ export function can(ctx: PermissionContext, action: GroupAction): boolean {
     case "post:moderate":
     case "member:review":
     case "member:ban":
+    case "report:review":
+    case "group:manage":
       return isAtLeast(role, "moderator");
+
+    case "invite:manage":
+      return isAtLeast(role, "admin");
   }
+}
+
+/**
+ * Removing or banning a member: moderators and up, only for people they
+ * outrank, never themselves. So moderators handle members, admins handle
+ * moderators, and the owner can't be removed.
+ */
+export function canModerateMember(ctx: PermissionContext, target: { userId: string; role: MemberRole }): boolean {
+  const role = activeRole(ctx);
+  if (!role || !isAtLeast(role, "moderator")) return false;
+  if (ctx.userId === target.userId) return false;
+  return roleRank(role) > roleRank(target.role);
+}
+
+/** Any signed-in reader can report someone else's content. */
+export function canReport(ctx: PermissionContext, content: { authorId: string }): boolean {
+  return ctx.userId !== null && ctx.userId !== content.authorId && can(ctx, "group:read");
+}
+
+/**
+ * An invite link works whatever the join policy, including for someone with a
+ * pending request. It never lets a banned user back in.
+ */
+export function canAcceptInvite(ctx: PermissionContext): boolean {
+  if (ctx.userId === null) return false;
+  return ctx.membership === null || ctx.membership.status === "pending";
 }
 
 /**
@@ -158,6 +192,8 @@ export function groupPermissions(ctx: PermissionContext) {
     postWithoutApproval: can(ctx, "post:publishWithoutApproval"),
     comment: can(ctx, "comment:create"),
     moderate: can(ctx, "post:moderate"),
+    manage: can(ctx, "group:manage"),
+    manageInvites: can(ctx, "invite:manage"),
   };
 }
 export type GroupPermissions = ReturnType<typeof groupPermissions>;
