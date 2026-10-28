@@ -12,7 +12,14 @@ export interface GroupCardData {
   memberCount: number;
 }
 
-export function GroupCard({ group }: { group: GroupCardData }) {
+export function GroupCard({
+  group,
+  footer,
+}: {
+  group: GroupCardData;
+  /** Extra line under the details, e.g. your role and the group's last activity. */
+  footer?: React.ReactNode;
+}) {
   return (
     <Link
       href={`/g/${group.slug}`}
@@ -32,6 +39,7 @@ export function GroupCard({ group }: { group: GroupCardData }) {
           {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
           {group.visibility === "private" ? " · Private" : ""}
         </p>
+        {footer ? <div className="border-t border-line pt-2 text-xs text-muted">{footer}</div> : null}
       </div>
     </Link>
   );

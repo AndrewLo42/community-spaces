@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { MainNav } from "@/components/main-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ButtonLink } from "@/components/ui";
@@ -23,21 +24,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen font-sans">
         <Providers>
           <header className="border-b border-line bg-surface">
-            <nav className="mx-auto flex max-w-5xl items-center gap-1 px-4 py-3">
+            <div className="mx-auto flex max-w-5xl items-center gap-1 px-4 py-3">
               <Link href="/" className="mr-2 whitespace-nowrap font-serif text-lg font-semibold tracking-tight sm:mr-4">
                 Community Spaces
               </Link>
-              <ButtonLink href="/discover" variant="ghost">
-                Discover
-              </ButtonLink>
+              {/* Signed-in phones get the section tabs below instead. */}
+              <div className={user ? "hidden sm:block" : undefined}>
+                <MainNav signedIn={!!user} variant="inline" />
+              </div>
               <div className="ml-auto flex items-center gap-1">
                 {user ? (
                   <>
-                    <span className="hidden sm:contents">
-                      <ButtonLink href="/groups/new" variant="ghost">
-                        New group
-                      </ButtonLink>
-                    </span>
                     <NotificationBell initialCount={unread} />
                     <ButtonLink href="/profile" variant="ghost" className="px-2 sm:px-4">
                       <span className="sm:hidden">
@@ -54,7 +51,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <ButtonLink href="/sign-in">Sign in</ButtonLink>
                 )}
               </div>
-            </nav>
+            </div>
+            {user ? (
+              <div className="border-t border-line sm:hidden">
+                <MainNav signedIn variant="tabs" />
+              </div>
+            ) : null}
           </header>
           <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
         </Providers>

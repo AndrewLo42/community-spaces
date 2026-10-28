@@ -5,7 +5,7 @@ import {
   groupPermissions,
   joinGroupInput,
 } from "@cs/core";
-import { and, desc, eq, groups, ilike, memberships, ne, or, sql } from "@cs/db";
+import { and, desc, eq, groups, ilike, inArray, memberships, ne, or, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess } from "../lib/access";
@@ -69,6 +69,42 @@ export const groupRouter = router({
       .where(and(eq(memberships.userId, ctx.user.id), eq(memberships.status, "active")))
       .orderBy(groups.name);
     return rows.map((g) => withBanner(ctx.storage, g));
+  }),
+
+  /**
+   * The My groups page: everything the viewer belongs to, split into groups
+   * they help run and groups they're a member of (most recently active
+   * first), plus requests still waiting for approval.
+   */
+  myGroups: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db
+      .select({
+        ...groupCard,
+        role: memberships.role,
+        status: memberships.status,
+        joinedAt: memberships.createdAt,
+        lastPostAt: sql<Date | null>`(
+          select max(${posts.createdAt}) from ${posts}
+          where ${posts.groupId} = ${groups.id} and ${posts.status} = 'published'
+        )`.mapWith(posts.createdAt),
+      })
+      .from(memberships)
+      .innerJoin(groups, eq(groups.id, memberships.groupId))
+      .where(and(eq(memberships.userId, ctx.user.id), inArray(memberships.status, ["active", "pending"])));
+
+    const byActivity = (a: (typeof rows)[number], b: (typeof rows)[number]) =>
+      (b.lastPostAt?.getTime() ?? 0) - (a.lastPostAt?.getTime() ?? 0) || a.name.localeCompare(b.name);
+    const active = rows.filter((r) => r.status === "active").sort(byActivity);
+    const view = (r: (typeof rows)[number]) => withBanner(ctx.storage, r);
+
+    return {
+      managing: active.filter((r) => r.role !== "member").map(view),
+      member: active.filter((r) => r.role === "member").map(view),
+      pending: rows
+        .filter((r) => r.status === "pending")
+        .sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime())
+        .map(view),
+    };
   }),
 
   bySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ ctx, input }) => {
