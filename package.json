@@ -1,0 +1,19 @@
+{
+  "name": "community-spaces",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @cs/db generate",
+    "db:migrate": "pnpm --filter @cs/db migrate",
+    "db:seed": "pnpm --filter @cs/db seed",
+    "db:studio": "pnpm --filter @cs/db studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10",
+    "typescript": "~6.0.3"
+  }
+}

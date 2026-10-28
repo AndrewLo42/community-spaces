@@ -1,0 +1,22 @@
+{
+  "name": "@cs/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cs/core": "workspace:*",
+    "@cs/db": "workspace:*",
+    "@trpc/server": "^11.19.0",
+    "superjson": "^2.2.6",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "~6.0.3"
+  }
+}

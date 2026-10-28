@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Calm, paper-like palette. Components use the semantic names (bg-surface,
+   text-muted, border-line…), never raw colors, so dark mode is one swap here. */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #efede7;
+  --fg: #1f2421;
+  --muted: #646b66;
+  --line: #e1ded6;
+  --accent: #2f6f5e;
+  --accent-fg: #ffffff;
+  --danger: #a33a2c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151816;
+    --surface: #1d211f;
+    --surface-2: #262b28;
+    --fg: #e9ece9;
+    --muted: #9aa39d;
+    --line: #333a36;
+    --accent: #6fbfa6;
+    --accent-fg: #0f1a16;
+    --danger: #e0735f;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
