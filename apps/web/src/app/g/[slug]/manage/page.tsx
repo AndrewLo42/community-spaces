@@ -120,6 +120,7 @@ export default async function ManagePage({
                 joinPolicy: group.joinPolicy,
                 postPolicy: group.postPolicy,
                 commentPolicy: group.commentPolicy,
+                eventPolicy: group.eventPolicy,
                 placeId: group.place?.id ?? null,
               }}
               initialPlace={group.place}

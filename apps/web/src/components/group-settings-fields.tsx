@@ -3,6 +3,7 @@
 import {
   GROUP_ACCENTS,
   type CommentPolicy,
+  type EventPolicy,
   type CreateGroupInput,
   type GroupVisibility,
   type JoinPolicy,
@@ -44,6 +45,11 @@ const postOptions: Option<PostPolicy>[] = [
 const commentOptions: Option<CommentPolicy>[] = [
   { value: "members", label: "All members", description: "Any member can comment." },
   { value: "admins", label: "Admins only", description: "Comments are limited to admins." },
+];
+
+const eventOptions: Option<EventPolicy>[] = [
+  { value: "members", label: "All members", description: "Any member can put a meetup on the calendar." },
+  { value: "admins", label: "Admins only", description: "Admins and the owner plan events; members RSVP." },
 ];
 
 export function GroupSettingsFields<T extends GroupSettings>({
@@ -153,6 +159,7 @@ export function GroupSettingsFields<T extends GroupSettings>({
           value={value.commentPolicy}
           onChange={(v) => set("commentPolicy", v)}
         />
+        <OptionGroup label="Who can plan events" options={eventOptions} value={value.eventPolicy} onChange={(v) => set("eventPolicy", v)} />
       </section>
     </div>
   );

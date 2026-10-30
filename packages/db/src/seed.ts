@@ -1,7 +1,7 @@
-import { GROUP_ACCENTS } from "@cs/core";
+import { GROUP_ACCENTS, zonedTimeToUtc } from "@cs/core";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { connect } from "./client";
-import { comments, groups, memberships, places, posts, users } from "./schema";
+import { comments, eventRsvps, events, groups, memberships, places, posts, users } from "./schema";
 
 // Sample local communities so Discover isn't empty in dev. Safe to re-run.
 
@@ -215,6 +215,49 @@ if (!anyPlace) {
     if (placeId) await db.update(users).set({ placeId }).where(and(eq(users.email, email), isNull(users.placeId)));
   }
   console.log("  + sample locations");
+}
+
+// Sample events around today, once per group (skipped if the group has events).
+const sampleEvents: Record<string, Array<{ organizer: string; title: string; days: number; start: string; end?: string; location: string; capacity?: number; description: string }>> = {
+  "riverside-community-garden": [
+    { organizer: "maria@example.com", title: "Fall seed swap", days: -18, start: "10:00", end: "12:00", location: "Riverside garden shed", description: "Bring labeled envelopes of anything you saved this year." },
+    { organizer: "maria@example.com", title: "Garden work day", days: 5, start: "09:00", end: "12:00", location: "Riverside Community Garden, main gate", capacity: 15, description: "Turning compost, mulching paths and putting beds to sleep for winter. Gloves and tools provided; coffee too." },
+  ],
+  "eastside-running-club": [
+    { organizer: "dev@example.com", title: "Morning 5k loop", days: 2, start: "08:00", location: "Laurelhurst Park boathouse", description: "All paces welcome. We regroup at the halfway point." },
+  ],
+  "downtown-book-circle": [
+    { organizer: "june@example.com", title: "Winter pick discussion", days: 12, start: "18:30", end: "20:00", location: "Central Library, room 3B", description: "Fiction pick for the season. Finished or not, come along." },
+  ],
+};
+
+const timeZone = "America/Los_Angeles";
+for (const [slug, eventsForGroup] of Object.entries(sampleEvents)) {
+  const [group] = await db.select({ id: groups.id }).from(groups).where(eq(groups.slug, slug));
+  if (!group) continue;
+  const [existing] = await db.select({ id: events.id }).from(events).where(eq(events.groupId, group.id)).limit(1);
+  if (existing) continue;
+  for (const e of eventsForGroup) {
+    const date = new Date(Date.now() + e.days * 86_400_000).toLocaleDateString("en-CA", { timeZone });
+    const organizerId = userIds.get(e.organizer)!;
+    const [event] = await db
+      .insert(events)
+      .values({
+        groupId: group.id,
+        createdById: organizerId,
+        title: e.title,
+        description: e.description,
+        startsAt: zonedTimeToUtc(date, e.start, timeZone)!,
+        endsAt: e.end ? zonedTimeToUtc(date, e.end, timeZone) : null,
+        timeZone,
+        location: e.location,
+        capacity: e.capacity ?? null,
+        goingCount: 1,
+      })
+      .returning({ id: events.id });
+    await db.insert(eventRsvps).values({ eventId: event!.id, userId: organizerId, status: "going" });
+  }
+  console.log(`  + events for ${slug}`);
 }
 
 await close();

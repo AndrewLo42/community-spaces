@@ -2,6 +2,7 @@ import {
   COMMENT_POLICIES,
   COMMENT_STATUSES,
   EMAIL_DIGEST_OPTIONS,
+  EVENT_POLICIES,
   GROUP_VISIBILITIES,
   JOIN_POLICIES,
   MEMBER_ROLES,
@@ -11,6 +12,7 @@ import {
   POST_STATUSES,
   REPORT_STATUSES,
   REPORT_TARGETS,
+  RSVP_STATUSES,
 } from "@cs/core";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -152,6 +154,7 @@ export const groupVisibility = pgEnum("group_visibility", GROUP_VISIBILITIES);
 export const joinPolicy = pgEnum("join_policy", JOIN_POLICIES);
 export const postPolicy = pgEnum("post_policy", POST_POLICIES);
 export const commentPolicy = pgEnum("comment_policy", COMMENT_POLICIES);
+export const eventPolicy = pgEnum("event_policy", EVENT_POLICIES);
 export const postStatus = pgEnum("post_status", POST_STATUSES);
 export const commentStatus = pgEnum("comment_status", COMMENT_STATUSES);
 export const reportTarget = pgEnum("report_target", REPORT_TARGETS);
@@ -173,6 +176,7 @@ export const groups = pgTable(
     joinPolicy: joinPolicy("join_policy").notNull().default("open"),
     postPolicy: postPolicy("post_policy").notNull().default("members"),
     commentPolicy: commentPolicy("comment_policy").notNull().default("members"),
+    eventPolicy: eventPolicy("event_policy").notNull().default("members"),
     // Denormalized so discovery and group headers never COUNT(*).
     memberCount: integer("member_count").notNull().default(0),
     createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -302,6 +306,54 @@ export const reports = pgTable(
     index("reports_group_status_idx").on(t.groupId, t.status, t.createdAt),
     index("reports_target_idx").on(t.targetType, t.targetId, t.status),
   ],
+);
+
+export const rsvpStatus = pgEnum("rsvp_status", RSVP_STATUSES);
+
+/**
+ * Meetups on a group's calendar. Times are instants; `timeZone` is the IANA
+ * zone they were planned in, which is how they're always displayed.
+ * Cancelling keeps the row so the history (and who planned to come) stays.
+ */
+export const events = pgTable(
+  "events",
+  {
+    id: id(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    timeZone: text("time_zone").notNull(),
+    location: text("location").notNull().default(""),
+    link: text("link").notNull().default(""),
+    /** Spots for "going"; null = no limit. */
+    capacity: integer("capacity"),
+    // Denormalized so event lists never COUNT(*).
+    goingCount: integer("going_count").notNull().default(0),
+    maybeCount: integer("maybe_count").notNull().default(0),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("events_group_starts_idx").on(t.groupId, t.startsAt)],
+);
+
+export const eventRsvps = pgTable(
+  "event_rsvps",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: rsvpStatus("status").notNull(),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index("event_rsvps_user_idx").on(t.userId)],
 );
 
 /** Shareable join links. The only way into invite-only and hidden groups. */

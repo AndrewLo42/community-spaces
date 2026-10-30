@@ -91,7 +91,7 @@ export function PostComposer({ groupId, needsApproval }: { groupId: string; need
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Share an update, ask a question, post an event…"
+          placeholder="Share an update or ask a question…"
           className="min-h-20 resize-y border-0 bg-transparent px-0 focus:ring-0"
           aria-label="Post text"
         />

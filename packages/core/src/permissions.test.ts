@@ -8,8 +8,10 @@ import {
   canCommentOnPost,
   canEditComment,
   canEditPost,
+  canManageEvent,
   canModerateMember,
   canReport,
+  canRsvp,
   canRemoveContent,
   canTransferOwnership,
   canViewPost,
@@ -22,6 +24,7 @@ const openPublic: GroupRules = {
   joinPolicy: "open",
   postPolicy: "members",
   commentPolicy: "members",
+  eventPolicy: "members",
 };
 
 function ctx(
@@ -260,5 +263,40 @@ describe("moderation", () => {
     assert.equal(canChangeRole("admin", "admin", "member"), false);
     assert.equal(canChangeRole("moderator", "member", "moderator"), false);
     assert.equal(canChangeRole("owner", "owner", "member"), false);
+  });
+});
+
+describe("events", () => {
+  it("members plan events unless the group keeps that to admins", () => {
+    assert.equal(can(ctx({}, { role: "member" }), "event:create"), true);
+    assert.equal(can(ctx({ eventPolicy: "admins" }, { role: "member" }), "event:create"), false);
+    assert.equal(can(ctx({ eventPolicy: "admins" }, { role: "moderator" }), "event:create"), false);
+    assert.equal(can(ctx({ eventPolicy: "admins" }, { role: "admin" }), "event:create"), true);
+    assert.equal(can(ctx({}, { role: "member", status: "pending" }), "event:create"), false);
+    assert.equal(can(ctx({}, null), "event:create"), false);
+  });
+
+  it("the organizer and moderators manage an event; other members don't", () => {
+    const event = { createdById: "u2" };
+    assert.equal(canManageEvent(ctx({}, { role: "member" }, "u2"), event), true);
+    assert.equal(canManageEvent(ctx({}, { role: "member" }, "u1"), event), false);
+    assert.equal(canManageEvent(ctx({}, { role: "moderator" }, "u1"), event), true);
+    // An organizer who left the group can't edit from outside.
+    assert.equal(canManageEvent(ctx({}, null, "u2"), event), false);
+  });
+
+  it("RSVPs close when an event ends or is cancelled, and Going respects capacity", () => {
+    const open = { cancelled: false, ended: false, capacity: null, goingCount: 3 };
+    const member = ctx({}, { role: "member" });
+    assert.equal(canRsvp(member, open, null, "going"), true);
+    assert.equal(canRsvp(ctx({}, null), open, null, "going"), false);
+    assert.equal(canRsvp(member, { ...open, ended: true }, null, "maybe"), false);
+    assert.equal(canRsvp(member, { ...open, cancelled: true }, null, "maybe"), false);
+
+    const full = { ...open, capacity: 3 };
+    assert.equal(canRsvp(member, full, null, "going"), false);
+    assert.equal(canRsvp(member, full, "maybe", "going"), false);
+    assert.equal(canRsvp(member, full, null, "maybe"), true);
+    assert.equal(canRsvp(member, full, "going", "going"), true);
   });
 });

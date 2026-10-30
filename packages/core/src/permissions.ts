@@ -1,12 +1,14 @@
 import {
   MEMBER_ROLES,
   type CommentPolicy,
+  type EventPolicy,
   type GroupVisibility,
   type JoinPolicy,
   type MemberRole,
   type MembershipStatus,
   type PostPolicy,
   type PostStatus,
+  type RsvpStatus,
 } from "./constants";
 
 // Every permission decision in the app goes through this file, so the rules
@@ -18,6 +20,7 @@ export interface GroupRules {
   joinPolicy: JoinPolicy;
   postPolicy: PostPolicy;
   commentPolicy: CommentPolicy;
+  eventPolicy: EventPolicy;
 }
 
 export interface MembershipState {
@@ -45,6 +48,7 @@ export type GroupAction =
   | "post:publishWithoutApproval"
   | "post:moderate" // pin, lock, remove, approve
   | "comment:create"
+  | "event:create"
   | "member:review" // approve / reject join requests
   | "member:ban"
   | "report:review"
@@ -102,6 +106,10 @@ export function can(ctx: PermissionContext, action: GroupAction): boolean {
     case "comment:create":
       if (!isMember) return false;
       return group.commentPolicy === "admins" ? isAtLeast(role, "admin") : true;
+
+    case "event:create":
+      if (!isMember) return false;
+      return group.eventPolicy === "admins" ? isAtLeast(role, "admin") : true;
 
     case "post:moderate":
     case "member:review":
@@ -186,6 +194,31 @@ export function canEditComment(
   return !post.locked || isAtLeast(activeRole(ctx), "moderator");
 }
 
+/**
+ * Whoever planned an event can change or cancel it, and so can moderators and
+ * up, so a meetup doesn't get stuck when its organizer goes quiet.
+ */
+export function canManageEvent(ctx: PermissionContext, event: { createdById: string | null }): boolean {
+  const role = activeRole(ctx);
+  if (!role) return false;
+  return (event.createdById !== null && event.createdById === ctx.userId) || isAtLeast(role, "moderator");
+}
+
+/**
+ * Members answer until the event is over. "Going" needs a free spot unless
+ * you already have one; "maybe" and "can't go" never take a spot.
+ */
+export function canRsvp(
+  ctx: PermissionContext,
+  event: { cancelled: boolean; ended: boolean; capacity: number | null; goingCount: number },
+  current: RsvpStatus | null,
+  next: RsvpStatus,
+): boolean {
+  if (!activeRole(ctx) || event.cancelled || event.ended) return false;
+  if (next !== "going" || current === "going" || event.capacity === null) return true;
+  return event.goingCount < event.capacity;
+}
+
 /** Only the owner hands the group over, and only to another active member. */
 export function canTransferOwnership(ctx: PermissionContext, target: { userId: string; status: MembershipStatus }): boolean {
   return activeRole(ctx) === "owner" && target.userId !== ctx.userId && target.status === "active";
@@ -214,6 +247,7 @@ export function groupPermissions(ctx: PermissionContext) {
     post: can(ctx, "post:create"),
     postWithoutApproval: can(ctx, "post:publishWithoutApproval"),
     comment: can(ctx, "comment:create"),
+    createEvent: can(ctx, "event:create"),
     moderate: can(ctx, "post:moderate"),
     manage: can(ctx, "group:manage"),
     manageInvites: can(ctx, "invite:manage"),

@@ -64,6 +64,13 @@
       "when": 1793385297236,
       "tag": "0008_drop_group_category",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793396837778,
+      "tag": "0009_events",
+      "breakpoints": true
     }
   ]
 }

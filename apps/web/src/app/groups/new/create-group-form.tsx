@@ -26,6 +26,7 @@ export function CreateGroupForm() {
     joinPolicy: "open",
     postPolicy: "members",
     commentPolicy: "members",
+    eventPolicy: "members",
     placeId: null,
   });
 

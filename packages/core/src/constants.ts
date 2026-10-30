@@ -31,6 +31,19 @@ export type PostPolicy = (typeof POST_POLICIES)[number];
 export const COMMENT_POLICIES = ["members", "admins"] as const;
 export type CommentPolicy = (typeof COMMENT_POLICIES)[number];
 
+/** Who can put events on the group's calendar. admins – admins and the owner. */
+export const EVENT_POLICIES = ["members", "admins"] as const;
+export type EventPolicy = (typeof EVENT_POLICIES)[number];
+
+export const RSVP_STATUSES = ["going", "maybe", "not_going"] as const;
+export type RsvpStatus = (typeof RSVP_STATUSES)[number];
+
+export const RSVP_LABELS: Record<RsvpStatus, string> = {
+  going: "Going",
+  maybe: "Maybe",
+  not_going: "Can't go",
+};
+
 export const POST_STATUSES = ["published", "pending", "removed"] as const;
 export type PostStatus = (typeof POST_STATUSES)[number];
 

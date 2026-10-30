@@ -1,4 +1,5 @@
 import { commentRouter } from "./routers/comment";
+import { eventRouter } from "./routers/event";
 import { groupRouter } from "./routers/group";
 import { inviteRouter } from "./routers/invite";
 import { manageRouter } from "./routers/manage";
@@ -16,6 +17,7 @@ export const appRouter = router({
   group: groupRouter,
   post: postRouter,
   comment: commentRouter,
+  event: eventRouter,
   report: reportRouter,
   invite: inviteRouter,
   manage: manageRouter,
@@ -31,3 +33,4 @@ export type { Context, SessionUser } from "./trpc";
 export type { Storage } from "./storage";
 export { deleteUnusedUploads } from "./lib/uploads";
 export type { PostView } from "./lib/posts";
+export type { EventView } from "./routers/event";

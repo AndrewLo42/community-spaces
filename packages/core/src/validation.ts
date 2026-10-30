@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   COMMENT_POLICIES,
   EMAIL_DIGEST_OPTIONS,
+  EVENT_POLICIES,
   GROUP_ACCENTS,
   GROUP_VISIBILITIES,
   IMAGE_CONTENT_TYPES,
@@ -12,9 +13,11 @@ import {
   POST_POLICIES,
   REPORT_REASONS,
   REPORT_TARGETS,
+  RSVP_STATUSES,
   UPLOAD_PURPOSES,
   type MemberRole,
 } from "./constants";
+import { isValidTimeZone, MAX_EVENT_CAPACITY, zonedTimeToUtc } from "./events";
 import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS_MILES, type RadiusMiles } from "./places";
 import { cleanTags, MAX_GROUP_TAGS, MAX_TAG_LENGTH, normalizeTag } from "./tags";
 
@@ -60,6 +63,7 @@ export const groupSettingsInput = z
     joinPolicy: z.enum(JOIN_POLICIES).default("open"),
     postPolicy: z.enum(POST_POLICIES).default("members"),
     commentPolicy: z.enum(COMMENT_POLICIES).default("members"),
+    eventPolicy: z.enum(EVENT_POLICIES).default("members"),
     /** null = no location (online groups). */
     placeId: placeIdSchema.nullable().default(null),
   })
@@ -194,3 +198,58 @@ export const markSeenInput = z.union([
 export const markReadInput = z.object({ ids: z.array(z.string().min(1)).min(1).max(100) });
 export const updatePreferencesInput = z.object({ emailDigest: z.enum(EMAIL_DIGEST_OPTIONS) });
 export const inviteIdInput = groupIdInput.extend({ inviteId: z.string().min(1) });
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+const timeSchema = z.string().regex(/^\d{2}:\d{2}$/, "Pick a time");
+
+/**
+ * What the event form sends: a day and wall-clock times in the planner's time
+ * zone, turned into instants here. An end time earlier than the start means
+ * the event runs past midnight.
+ */
+export const eventFieldsInput = z
+  .object({
+    title: z.string().trim().min(3, "At least 3 characters").max(120),
+    description: z.string().trim().max(5000).default(""),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date"),
+    startTime: timeSchema,
+    endTime: timeSchema.or(z.literal("")).default(""),
+    timeZone: z.string().refine(isValidTimeZone, "Unknown time zone"),
+    /** Free text: "Riverside garden shed", "Powell's, 1005 W Burnside", "Online". */
+    location: z.string().trim().max(200).default(""),
+    /** A map, ticket or video-call link. */
+    link: z
+      .string()
+      .trim()
+      .max(500)
+      .refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), "Start the link with https://")
+      .default(""),
+    capacity: z.number().int().min(1, "At least 1").max(MAX_EVENT_CAPACITY).nullable().default(null),
+  })
+  .transform((e, ctx) => {
+    const startsAt = zonedTimeToUtc(e.date, e.startTime, e.timeZone);
+    if (!startsAt) {
+      ctx.addIssue({ code: "custom", path: ["date"], message: "Pick a date" });
+      return z.NEVER;
+    }
+    let endsAt = e.endTime ? zonedTimeToUtc(e.date, e.endTime, e.timeZone) : null;
+    if (endsAt && endsAt <= startsAt) endsAt = new Date(endsAt.getTime() + 24 * 3_600_000);
+    const { date: _date, startTime: _startTime, endTime: _endTime, ...rest } = e;
+    return { ...rest, startsAt, endsAt };
+  });
+
+export const createEventInput = z.object({ groupId: z.string().min(1) }).and(eventFieldsInput);
+export const updateEventInput = z.object({ eventId: z.string().min(1) }).and(eventFieldsInput);
+
+export const listEventsInput = z.object({
+  groupId: z.string().min(1),
+  when: z.enum(["upcoming", "past"]).default("upcoming"),
+  cursor: z.number().int().min(0).default(0),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+export const rsvpInput = z.object({
+  eventId: z.string().min(1),
+  status: z.enum(RSVP_STATUSES),
+});
