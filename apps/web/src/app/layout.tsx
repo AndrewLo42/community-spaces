@@ -15,7 +15,14 @@ export const metadata: Metadata = {
   description: "A calm home for local communities.",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  /** A post opened over the current page (see @modal). */
+  modal: React.ReactNode;
+}) {
   const user = await getSessionUser();
   const unread = user ? await (await serverApi()).notification.unreadCount() : 0;
 
@@ -70,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </a>
             .
           </footer>
+          {modal}
         </Providers>
       </body>
     </html>
