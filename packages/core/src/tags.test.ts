@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cleanTags, MAX_GROUP_TAGS, normalizeTag, TAG_PATTERN } from "./tags";
+import { cleanTags, MAX_GROUP_TAGS, normalizeTag, parseSearch, TAG_PATTERN } from "./tags";
 
 describe("tags", () => {
   it("normalizes what people type into one spelling", () => {
@@ -27,5 +27,12 @@ describe("tags", () => {
   it("dedupes after normalizing and keeps the first few", () => {
     assert.deepEqual(cleanTags(["Gardening", "#gardening", "compost", ""]), ["gardening", "compost"]);
     assert.equal(cleanTags(["aa", "bb", "cc", "dd", "ee", "ff", "gg"]).length, MAX_GROUP_TAGS);
+  });
+
+  it("splits a search into hashtag filters and words", () => {
+    assert.deepEqual(parseSearch("#Gardening raised beds"), { tags: ["gardening"], text: "raised beds" });
+    assert.deepEqual(parseSearch("  books   #book-club #Book-Club "), { tags: ["book-club"], text: "books" });
+    assert.deepEqual(parseSearch("# #a running"), { tags: [], text: "running" });
+    assert.deepEqual(parseSearch(""), { tags: [], text: "" });
   });
 });

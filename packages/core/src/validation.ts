@@ -46,6 +46,8 @@ export const tagsSchema = z
 
 export const tagSuggestInput = z.object({ prefix: z.string().trim().max(MAX_TAG_LENGTH + 1) });
 
+export const groupSuggestInput = z.object({ query: z.string().trim().min(1).max(100) });
+
 export const groupSettingsInput = z
   .object({
     name: z.string().trim().min(3, "At least 3 characters").max(80),
@@ -70,9 +72,8 @@ export const createGroupInput = groupSettingsInput.and(z.object({ slug: slugSche
 export type CreateGroupInput = z.infer<typeof createGroupInput>;
 
 export const discoverGroupsInput = z.object({
-  query: z.string().trim().max(100).optional(),
-  /** Only groups with this hashtag. */
-  tag: z.string().max(MAX_TAG_LENGTH + 1).transform((t) => normalizeTag(t) ?? undefined).optional(),
+  /** Words to search for; any "#hashtag" in it is a filter instead (see parseSearch). */
+  query: z.string().trim().max(200).optional(),
   /** Only groups within `radius` miles of this place, nearest first. */
   near: placeIdSchema.optional(),
   radius: z.union(RADIUS_OPTIONS_MILES.map((r) => z.literal(r)) as [z.ZodLiteral<RadiusMiles>, ...z.ZodLiteral<RadiusMiles>[]]).default(DEFAULT_RADIUS_MILES),

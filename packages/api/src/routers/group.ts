@@ -4,8 +4,10 @@ import {
   createGroupInput,
   discoverGroupsInput,
   groupPermissions,
+  groupSuggestInput,
   joinGroupInput,
   normalizeTag,
+  parseSearch,
 } from "@cs/core";
 import { and, asc, between, desc, eq, groups, ilike, inArray, memberships, ne, or, places, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
@@ -43,6 +45,21 @@ function toCard<T extends CardRow>(storage: Storage, row: T) {
   return { ...rest, bannerUrl: bannerKey ? storage.publicUrl(bannerKey) : null };
 }
 
+/** Full-text, partial-name or hashtag-prefix match for typed words ("gard" finds "Garden Club" and #gardening). */
+function matchesText(text: string) {
+  const asTag = normalizeTag(text);
+  return or(
+    sql`${groups.searchVector} @@ websearch_to_tsquery('english', ${text})`,
+    ilike(groups.name, containsPattern(text)),
+    asTag ? sql`exists (select 1 from unnest(${groups.tags}) as t(tag) where t.tag like ${prefixPattern(asTag)})` : undefined,
+  )!;
+}
+
+/** Groups carrying every one of these hashtags. */
+function hasAllTags(tags: string[]) {
+  return sql`${groups.tags} @> array[${sql.join(tags.map((t) => sql`${t}`), sql`, `)}]::text[]`;
+}
+
 /** Great-circle miles from a fixed point to the joined place, computed in SQL. */
 function milesFrom(center: { lat: number; lng: number }) {
   return sql<number>`3958.8 * 2 * asin(sqrt(
@@ -59,22 +76,14 @@ export const groupRouter = router({
    */
   discover: publicProcedure.input(discoverGroupsInput).query(async ({ ctx, input }) => {
     const filters = [ne(groups.visibility, "hidden")];
-    if (input.tag) filters.push(sql`${groups.tags} @> array[${input.tag}]::text[]`);
+    const { tags, text } = parseSearch(input.query ?? "");
+    // Every #hashtag in the search must be on the group, spelled exactly.
+    if (tags.length) filters.push(hasAllTags(tags));
 
     const order = [desc(groups.memberCount), desc(groups.createdAt)];
-    if (input.query) {
-      const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
-      // Full-text match, plus a substring match so partial words ("gard") still find things.
-      // A word that's the start of a hashtag ("garden" → #gardening) matches too.
-      const asTag = normalizeTag(input.query);
-      filters.push(
-        or(
-          sql`${groups.searchVector} @@ ${tsquery}`,
-          ilike(groups.name, containsPattern(input.query)),
-          asTag ? sql`exists (select 1 from unnest(${groups.tags}) as t(tag) where t.tag like ${prefixPattern(asTag)})` : undefined,
-        )!,
-      );
-      order.unshift(desc(sql`ts_rank(${groups.searchVector}, ${tsquery})`));
+    if (text) {
+      filters.push(matchesText(text));
+      order.unshift(desc(sql`ts_rank(${groups.searchVector}, websearch_to_tsquery('english', ${text}))`));
     }
 
     let distance: ReturnType<typeof milesFrom> | null = null;
@@ -106,6 +115,22 @@ export const groupRouter = router({
       groups: rows.slice(0, PAGE_SIZE).map((g) => toCard(ctx.storage, g)),
       nextCursor: rows.length > PAGE_SIZE ? input.cursor + PAGE_SIZE : null,
     };
+  }),
+
+  /** A few groups whose names match what's typed in the Discover box, to jump straight to one. */
+  suggest: publicProcedure.input(groupSuggestInput).query(async ({ ctx, input }) => {
+    const { tags, text } = parseSearch(input.query);
+    if (!text) return [];
+    const filters = [ne(groups.visibility, "hidden"), matchesText(text)];
+    if (tags.length) filters.push(hasAllTags(tags));
+    const rows = await ctx.db
+      .select({ slug: groups.slug, name: groups.name, accentColor: groups.accentColor, placeId: places.id, placeName: places.name, placeState: places.state })
+      .from(groups)
+      .leftJoin(places, eq(places.id, groups.placeId))
+      .where(and(...filters))
+      .orderBy(desc(ilike(groups.name, prefixPattern(text))), desc(groups.memberCount))
+      .limit(5);
+    return rows.map(foldPlace);
   }),
 
   /** Groups the viewer belongs to, for the home screen. */

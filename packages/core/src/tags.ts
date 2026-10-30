@@ -45,3 +45,23 @@ export function cleanTags(inputs: string[]): string[] {
 export function tagLabel(tag: string): string {
   return `#${tag}`;
 }
+
+/**
+ * Splits a Discover search into hashtags and words: "#gardening raised beds"
+ * → { tags: ["gardening"], text: "raised beds" }. Each hashtag is a filter
+ * (groups must have all of them); the words are a normal search.
+ */
+export function parseSearch(input: string): { tags: string[]; text: string } {
+  const tags: string[] = [];
+  const words: string[] = [];
+  for (const token of input.trim().split(/\s+/)) {
+    if (!token) continue;
+    if (token.startsWith("#")) {
+      const tag = normalizeTag(token);
+      if (tag && !tags.includes(tag)) tags.push(tag);
+    } else {
+      words.push(token);
+    }
+  }
+  return { tags: tags.slice(0, MAX_GROUP_TAGS), text: words.join(" ") };
+}

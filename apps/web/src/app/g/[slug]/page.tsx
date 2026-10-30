@@ -122,7 +122,7 @@ export default async function GroupPage({
             {group.tags.length > 0 ? (
               <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
                 {group.tags.map((t) => (
-                  <Link key={t} href={`/discover?tag=${encodeURIComponent(t)}&near=any`} className="text-accent hover:underline">
+                  <Link key={t} href={`/discover?${new URLSearchParams({ q: tagLabel(t), near: "any" })}`} className="text-accent hover:underline">
                     {tagLabel(t)}
                   </Link>
                 ))}

@@ -7,11 +7,11 @@ import { publicProcedure, router } from "../trpc";
 // At community scale this is a small aggregate; if it grows, a tag-count table
 // maintained on group save would replace it.
 
-function tagCounts(prefix: string | null, limit: number) {
+function tagCounts(prefix: string, limit: number) {
   return sql<{ tag: string; groups: number }>`
     select t.tag, count(*)::int as groups
     from ${groups}, unnest(${groups.tags}) as t(tag)
-    where ${ne(groups.visibility, "hidden")} ${prefix ? sql`and t.tag like ${prefixPattern(prefix)}` : sql``}
+    where ${ne(groups.visibility, "hidden")} and t.tag like ${prefixPattern(prefix)}
     group by t.tag
     order by groups desc, t.tag
     limit ${limit}
@@ -19,13 +19,7 @@ function tagCounts(prefix: string | null, limit: number) {
 }
 
 export const tagRouter = router({
-  /** The tags shown as chips on Discover. */
-  popular: publicProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db.execute<{ tag: string; groups: number }>(tagCounts(null, 12));
-    return [...rows];
-  }),
-
-  /** Existing tags to offer while someone types, so groups converge on the same spelling. */
+  /** Existing tags to offer while someone types (group settings and the Discover box), most used first. */
   suggest: publicProcedure.input(tagSuggestInput).query(async ({ ctx, input }) => {
     // normalizeTag needs two characters; for one-letter prefixes, the letter itself is enough.
     const typed = input.prefix.replace(/^#+/, "").toLowerCase();
