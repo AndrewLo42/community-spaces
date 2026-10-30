@@ -79,32 +79,6 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
   owner: "Owner",
 };
 
-export const GROUP_CATEGORIES = [
-  "neighborhood",
-  "hobbies",
-  "sports",
-  "arts",
-  "parents",
-  "volunteering",
-  "education",
-  "faith",
-  "local-business",
-  "other",
-] as const;
-export type GroupCategory = (typeof GROUP_CATEGORIES)[number];
-
-export const CATEGORY_LABELS: Record<GroupCategory, string> = {
-  neighborhood: "Neighborhood",
-  hobbies: "Hobbies",
-  sports: "Sports & fitness",
-  arts: "Arts & culture",
-  parents: "Parents & families",
-  volunteering: "Volunteering",
-  education: "Learning",
-  faith: "Faith",
-  "local-business": "Local business",
-  other: "Other",
-};
 
 /** Accent swatches an owner can pick for their group. */
 export const GROUP_ACCENTS = [

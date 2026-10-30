@@ -165,7 +165,8 @@ export const groups = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     rules: text("rules").notNull().default(""),
-    category: text("category").notNull(),
+    /** Owner-chosen hashtags, stored normalized without the "#" (see core/tags.ts). */
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     accentColor: text("accent_color").notNull(),
     bannerKey: text("banner_key"),
     visibility: groupVisibility("visibility").notNull().default("public"),
@@ -184,6 +185,8 @@ export const groups = pgTable(
   },
   (t) => [
     index("groups_search_idx").using("gin", t.searchVector),
+    // tags @> ARRAY['gardening'] for the Discover tag filter
+    index("groups_tags_idx").using("gin", t.tags),
     index("groups_discover_idx").on(t.visibility, t.memberCount.desc()),
   ],
 );

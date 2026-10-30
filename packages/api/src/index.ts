@@ -6,6 +6,7 @@ import { notificationRouter } from "./routers/notification";
 import { placeRouter } from "./routers/place";
 import { postRouter } from "./routers/post";
 import { reportRouter } from "./routers/report";
+import { tagRouter } from "./routers/tag";
 import { uploadRouter } from "./routers/upload";
 import { userRouter } from "./routers/user";
 import { createCallerFactory, router } from "./trpc";
@@ -21,6 +22,7 @@ export const appRouter = router({
   notification: notificationRouter,
   upload: uploadRouter,
   place: placeRouter,
+  tag: tagRouter,
 });
 
 export type AppRouter = typeof appRouter;

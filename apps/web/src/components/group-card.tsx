@@ -1,11 +1,11 @@
-import { CATEGORY_LABELS, formatDistance, placeLabel, type GroupCategory, type PlaceSummary } from "@cs/core";
+import { formatDistance, placeLabel, tagLabel, type PlaceSummary } from "@cs/core";
 import Link from "next/link";
 
 export interface GroupCardData {
   slug: string;
   name: string;
   description: string;
-  category: string;
+  tags: string[];
   accentColor: string;
   bannerUrl: string | null;
   visibility: "public" | "private" | "hidden";
@@ -45,8 +45,15 @@ export function GroupCard({
             ) : null}
           </p>
         ) : null}
+        {group.tags.length > 0 ? (
+          // Plain text here: the whole card is already a link to the group.
+          <p className="flex flex-wrap gap-x-2 text-xs text-accent">
+            {group.tags.map((t) => (
+              <span key={t}>{tagLabel(t)}</span>
+            ))}
+          </p>
+        ) : null}
         <p className="text-xs text-muted">
-          {CATEGORY_LABELS[group.category as GroupCategory] ?? group.category} ·{" "}
           {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
           {group.visibility === "private" ? " · Private" : ""}
         </p>

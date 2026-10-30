@@ -1,10 +1,9 @@
 import {
-  CATEGORY_LABELS,
   DEFAULT_RADIUS_MILES,
-  GROUP_CATEGORIES,
+  normalizeTag,
   placeLabel,
   RADIUS_OPTIONS_MILES,
-  type GroupCategory,
+  tagLabel,
   type PlaceSummary,
   type RadiusMiles,
 } from "@cs/core";
@@ -18,14 +17,12 @@ import { DiscoverSearchForm } from "./search-form";
 
 export const metadata: Metadata = { title: "Discover" };
 
-type SearchParams = Promise<{ q?: string; category?: string; cursor?: string; near?: string; radius?: string }>;
+type SearchParams = Promise<{ q?: string; tag?: string; cursor?: string; near?: string; radius?: string }>;
 
 export default async function DiscoverPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const query = params.q?.trim() || undefined;
-  const category = GROUP_CATEGORIES.includes(params.category as GroupCategory)
-    ? (params.category as GroupCategory)
-    : undefined;
+  const tag = params.tag ? (normalizeTag(params.tag) ?? undefined) : undefined;
   const cursor = Number(params.cursor) || 0;
   const radius = (RADIUS_OPTIONS_MILES as readonly number[]).includes(Number(params.radius))
     ? (Number(params.radius) as RadiusMiles)
@@ -40,12 +37,18 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
     near = (await api.user.me())?.place ?? null;
   }
 
-  const { groups, nextCursor } = await api.group.discover({ query, category, cursor, near: near?.id, radius });
+  const [{ groups, nextCursor }, popular] = await Promise.all([
+    api.group.discover({ query, tag, cursor, near: near?.id, radius }),
+    api.tag.popular(),
+  ]);
+  // Keep the active tag visible as a chip even when it isn't one of the most used.
+  const chips = popular.map((p) => p.tag);
+  if (tag && !chips.includes(tag)) chips.unshift(tag);
 
-  const href = (next: { category?: string; cursor?: number }) => {
+  const href = (next: { tag?: string; cursor?: number }) => {
     const sp = new URLSearchParams();
     if (query) sp.set("q", query);
-    if (next.category) sp.set("category", next.category);
+    if (next.tag) sp.set("tag", next.tag);
     sp.set("near", near ? String(near.id) : "any");
     if (near) sp.set("radius", String(radius));
     if (next.cursor) sp.set("cursor", String(next.cursor));
@@ -54,7 +57,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
   const anywhere = (() => {
     const sp = new URLSearchParams({ near: "any" });
     if (query) sp.set("q", query);
-    if (category) sp.set("category", category);
+    if (tag) sp.set("tag", tag);
     return `/discover?${sp}`;
   })();
 
@@ -65,7 +68,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
         <p className="mt-1 text-sm text-muted">Find the people near you who care about the same things.</p>
       </div>
 
-      <DiscoverSearchForm query={query} category={category} near={near} radius={radius} />
+      <DiscoverSearchForm query={query} tag={tag} near={near} radius={radius} />
 
       {near ? (
         <p className="text-sm text-muted">
@@ -76,24 +79,27 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <CategoryChip href={href({})} active={!category}>
-          All
-        </CategoryChip>
-        {GROUP_CATEGORIES.map((c) => (
-          <CategoryChip key={c} href={href({ category: c })} active={category === c}>
-            {CATEGORY_LABELS[c]}
-          </CategoryChip>
-        ))}
-      </div>
+      {chips.length > 0 ? (
+        <nav aria-label="Popular hashtags" className="flex flex-wrap gap-2">
+          <TagChip href={href({})} active={!tag}>
+            All
+          </TagChip>
+          {chips.map((t) => (
+            // Clicking the active tag again clears it.
+            <TagChip key={t} href={href(t === tag ? {} : { tag: t })} active={t === tag}>
+              {tagLabel(t)}
+            </TagChip>
+          ))}
+        </nav>
+      ) : null}
 
       {groups.length === 0 ? (
         <EmptyState
           title={
             near
-              ? `No groups${query ? ` matching "${query}"` : ""} within ${radius} mi of ${placeLabel(near)}`
-              : query
-                ? `No groups match "${query}"`
+              ? `No groups${describe(query, tag)} within ${radius} mi of ${placeLabel(near)}`
+              : query || tag
+                ? `No groups${describe(query, tag)}`
                 : "No groups here yet"
           }
         >
@@ -121,7 +127,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
 
       {nextCursor !== null ? (
         <div className="text-center">
-          <ButtonLink href={href({ category, cursor: nextCursor })} variant="secondary">
+          <ButtonLink href={href({ tag, cursor: nextCursor })} variant="secondary">
             More groups
           </ButtonLink>
         </div>
@@ -130,7 +136,12 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
   );
 }
 
-function CategoryChip({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+/** ' matching "garden" tagged #compost' */
+function describe(query?: string, tag?: string) {
+  return `${query ? ` matching "${query}"` : ""}${tag ? ` tagged ${tagLabel(tag)}` : ""}`;
+}
+
+function TagChip({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
   return (
     <Link
       href={href}

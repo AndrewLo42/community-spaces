@@ -3,7 +3,6 @@ import {
   COMMENT_POLICIES,
   EMAIL_DIGEST_OPTIONS,
   GROUP_ACCENTS,
-  GROUP_CATEGORIES,
   GROUP_VISIBILITIES,
   IMAGE_CONTENT_TYPES,
   JOIN_POLICIES,
@@ -17,6 +16,7 @@ import {
   type MemberRole,
 } from "./constants";
 import { DEFAULT_RADIUS_MILES, RADIUS_OPTIONS_MILES, type RadiusMiles } from "./places";
+import { cleanTags, MAX_GROUP_TAGS, MAX_TAG_LENGTH, normalizeTag } from "./tags";
 
 export const slugSchema = z
   .string()
@@ -38,12 +38,21 @@ export function slugify(name: string): string {
 
 export const placeIdSchema = z.number().int().positive();
 
+export const tagsSchema = z
+  .array(z.string().max(60))
+  .max(MAX_GROUP_TAGS * 2)
+  .default([])
+  .transform(cleanTags);
+
+export const tagSuggestInput = z.object({ prefix: z.string().trim().max(MAX_TAG_LENGTH + 1) });
+
 export const groupSettingsInput = z
   .object({
     name: z.string().trim().min(3, "At least 3 characters").max(80),
     description: z.string().trim().max(2000).default(""),
     rules: z.string().trim().max(4000).default(""),
-    category: z.enum(GROUP_CATEGORIES),
+    /** Hashtags in any spelling; stored normalized ("Trail Running" → "trail-running"). */
+    tags: tagsSchema,
     accentColor: z.enum(GROUP_ACCENTS).default(GROUP_ACCENTS[0]),
     visibility: z.enum(GROUP_VISIBILITIES).default("public"),
     joinPolicy: z.enum(JOIN_POLICIES).default("open"),
@@ -62,7 +71,8 @@ export type CreateGroupInput = z.infer<typeof createGroupInput>;
 
 export const discoverGroupsInput = z.object({
   query: z.string().trim().max(100).optional(),
-  category: z.enum(GROUP_CATEGORIES).optional(),
+  /** Only groups with this hashtag. */
+  tag: z.string().max(MAX_TAG_LENGTH + 1).transform((t) => normalizeTag(t) ?? undefined).optional(),
   /** Only groups within `radius` miles of this place, nearest first. */
   near: placeIdSchema.optional(),
   radius: z.union(RADIUS_OPTIONS_MILES.map((r) => z.literal(r)) as [z.ZodLiteral<RadiusMiles>, ...z.ZodLiteral<RadiusMiles>[]]).default(DEFAULT_RADIUS_MILES),

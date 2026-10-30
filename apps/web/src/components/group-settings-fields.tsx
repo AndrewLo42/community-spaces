@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  CATEGORY_LABELS,
   GROUP_ACCENTS,
-  GROUP_CATEGORIES,
   type CommentPolicy,
   type CreateGroupInput,
   type GroupVisibility,
@@ -13,7 +11,8 @@ import {
 } from "@cs/core";
 import { useState } from "react";
 import { PlacePicker } from "./place-picker";
-import { cx, Field, Input, Select, Textarea } from "./ui";
+import { TagInput } from "./tag-input";
+import { cx, Field, Input, Textarea } from "./ui";
 
 /** Everything about a group except its address. Shared by create and settings. */
 export type GroupSettings = Omit<CreateGroupInput, "slug">;
@@ -101,17 +100,14 @@ export function GroupSettingsFields<T extends GroupSettings>({
           />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Category">
-            <Select value={value.category} onChange={(e) => set("category", e.target.value as T["category"])}>
-              {GROUP_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        {/* Not a <label>: the chips inside have their own buttons. */}
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium">Hashtags</span>
+          <TagInput value={value.tags} onChange={(tags) => set("tags", tags)} />
+          {errors.tags ? <span className="block text-xs text-danger">{errors.tags}</span> : null}
+        </div>
 
+        <div>
           <div className="space-y-1.5">
             <span className="text-sm font-medium">Accent color</span>
             <div className="flex gap-2 py-1">

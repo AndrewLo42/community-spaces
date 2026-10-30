@@ -1,6 +1,7 @@
-import { CATEGORY_LABELS, placeLabel, type GroupCategory } from "@cs/core";
+import { placeLabel, tagLabel } from "@cs/core";
 import { TRPCError } from "@trpc/server";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PostCard } from "@/components/post-card";
 import { PostComposer } from "@/components/post-composer";
@@ -99,6 +100,9 @@ export default async function GroupPage({
   const { cursor } = await searchParams;
   const [{ group, membership, permissions }, user] = await Promise.all([loadGroup(slug), getSessionUser()]);
   const attention = permissions.manage ? await needsAttention(group.id) : 0;
+  const details = [group.place ? placeLabel(group.place) : null, group.visibility !== "public" ? group.visibility : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="space-y-6">
@@ -111,12 +115,19 @@ export default async function GroupPage({
         )}
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">
-              {CATEGORY_LABELS[group.category as GroupCategory] ?? group.category}
-              {group.place ? ` · ${placeLabel(group.place)}` : ""}
-              {group.visibility !== "public" ? ` · ${group.visibility}` : ""}
-            </p>
-            <h1 className="mt-1 font-serif text-3xl font-semibold tracking-tight">{group.name}</h1>
+            {details ? (
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">{details}</p>
+            ) : null}
+            <h1 className="font-serif text-3xl font-semibold tracking-tight">{group.name}</h1>
+            {group.tags.length > 0 ? (
+              <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {group.tags.map((t) => (
+                  <Link key={t} href={`/discover?tag=${encodeURIComponent(t)}&near=any`} className="text-accent hover:underline">
+                    {tagLabel(t)}
+                  </Link>
+                ))}
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-muted">
               {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
               {membership?.status === "active" && membership.role !== "member" ? ` · You're ${membership.role === "owner" ? "the owner" : `a ${membership.role}`}` : ""}

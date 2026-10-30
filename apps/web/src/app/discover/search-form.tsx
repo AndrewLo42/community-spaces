@@ -11,12 +11,12 @@ import { Button, Input, Select } from "@/components/ui";
  */
 export function DiscoverSearchForm({
   query,
-  category,
+  tag,
   near,
   radius,
 }: {
   query?: string;
-  category?: string;
+  tag?: string;
   near: PlaceSummary | null;
   radius: RadiusMiles;
 }) {
@@ -27,7 +27,7 @@ export function DiscoverSearchForm({
       <Input name="q" defaultValue={query} placeholder="Search by name or topic: garden, running, books…" aria-label="Search groups" />
       <PlacePicker value={place} onChange={setPlace} placeholder="Anywhere" ariaLabel="Near town" />
       <input type="hidden" name="near" value={place?.id ?? "any"} />
-      {category ? <input type="hidden" name="category" value={category} /> : null}
+      {tag ? <input type="hidden" name="tag" value={tag} /> : null}
       <Select name="radius" defaultValue={String(radius)} aria-label="Distance" className="sm:w-28" disabled={!place}>
         {RADIUS_OPTIONS_MILES.map((r) => (
           <option key={r} value={r}>

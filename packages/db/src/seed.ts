@@ -1,5 +1,5 @@
-import { GROUP_ACCENTS, type GroupCategory } from "@cs/core";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { GROUP_ACCENTS } from "@cs/core";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { connect } from "./client";
 import { comments, groups, memberships, places, posts, users } from "./schema";
 
@@ -18,7 +18,7 @@ const sampleGroups: Array<{
   name: string;
   description: string;
   rules: string;
-  category: GroupCategory;
+  tags: string[];
   owner: string;
   visibility?: "public" | "private";
   joinPolicy?: "open" | "request";
@@ -30,7 +30,7 @@ const sampleGroups: Array<{
     description:
       "Plot holders and volunteers at the Riverside garden. Work days, seed swaps, harvest sharing and who's watering this week.",
     rules: "Be kind. Tag posts about shared tools with [tools]. No selling produce here.",
-    category: "neighborhood",
+    tags: ["gardening", "community-garden", "volunteering"],
     owner: "maria@example.com",
   },
   {
@@ -38,7 +38,7 @@ const sampleGroups: Array<{
     name: "Eastside Running Club",
     description: "Free weekly group runs for every pace. Saturday 8am at the boathouse, Wednesday evening trail runs.",
     rules: "Route changes are posted by organizers only.",
-    category: "sports",
+    tags: ["running", "5k", "trail-running"],
     owner: "dev@example.com",
     postPolicy: "approval",
   },
@@ -47,7 +47,7 @@ const sampleGroups: Array<{
     name: "Downtown Book Circle",
     description: "A monthly book club that meets at the central library. We read one fiction and one non-fiction pick each season.",
     rules: "Mark spoilers. Be generous with differing opinions.",
-    category: "arts",
+    tags: ["books", "book-club"],
     owner: "june@example.com",
     visibility: "private",
     joinPolicy: "request",
@@ -57,7 +57,7 @@ const sampleGroups: Array<{
     name: "Maple Street Neighbors",
     description: "Announcements for the Maple Street block association: street sweeping, block party, lost and found.",
     rules: "Announcements come from the block committee. Questions go in the comments.",
-    category: "neighborhood",
+    tags: ["neighborhood", "block-association"],
     owner: "maria@example.com",
     postPolicy: "admins",
   },
@@ -70,6 +70,14 @@ for (const o of organizers) {
   userIds.set(o.email, row!.id);
 }
 
+// Groups created before hashtags existed only have their old category as a tag.
+for (const g of sampleGroups) {
+  await db
+    .update(groups)
+    .set({ tags: g.tags })
+    .where(and(eq(groups.slug, g.slug), sql`cardinality(${groups.tags}) <= 1`));
+}
+
 for (const [i, g] of sampleGroups.entries()) {
   const ownerId = userIds.get(g.owner)!;
   const [created] = await db
@@ -79,7 +87,7 @@ for (const [i, g] of sampleGroups.entries()) {
       name: g.name,
       description: g.description,
       rules: g.rules,
-      category: g.category,
+      tags: g.tags,
       accentColor: GROUP_ACCENTS[i % GROUP_ACCENTS.length]!,
       visibility: g.visibility ?? "public",
       joinPolicy: g.joinPolicy ?? "open",

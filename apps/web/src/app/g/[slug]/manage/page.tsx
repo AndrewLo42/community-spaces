@@ -113,8 +113,8 @@ export default async function ManagePage({
                 name: group.name,
                 description: group.description,
                 rules: group.rules,
-                // Stored as text; written only through validated input, so these narrow safely.
-                category: group.category as GroupSettings["category"],
+                tags: group.tags,
+                // Stored as text; written only through validated input, so this narrows safely.
                 accentColor: group.accentColor as GroupSettings["accentColor"],
                 visibility: group.visibility,
                 joinPolicy: group.joinPolicy,

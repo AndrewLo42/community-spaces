@@ -5,6 +5,7 @@ import {
   discoverGroupsInput,
   groupPermissions,
   joinGroupInput,
+  normalizeTag,
 } from "@cs/core";
 import { and, asc, between, desc, eq, groups, ilike, inArray, memberships, ne, or, places, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
@@ -12,7 +13,7 @@ import { z } from "zod";
 import { loadGroupAccess } from "../lib/access";
 import { notifyModQueue } from "../lib/notify";
 import { assertPlace, foldPlace, getPlace } from "../lib/places";
-import { containsPattern } from "../lib/search";
+import { containsPattern, prefixPattern } from "../lib/search";
 import type { Storage } from "../storage";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
@@ -24,7 +25,7 @@ const groupCard = {
   slug: groups.slug,
   name: groups.name,
   description: groups.description,
-  category: groups.category,
+  tags: groups.tags,
   accentColor: groups.accentColor,
   visibility: groups.visibility,
   memberCount: groups.memberCount,
@@ -58,13 +59,21 @@ export const groupRouter = router({
    */
   discover: publicProcedure.input(discoverGroupsInput).query(async ({ ctx, input }) => {
     const filters = [ne(groups.visibility, "hidden")];
-    if (input.category) filters.push(eq(groups.category, input.category));
+    if (input.tag) filters.push(sql`${groups.tags} @> array[${input.tag}]::text[]`);
 
     const order = [desc(groups.memberCount), desc(groups.createdAt)];
     if (input.query) {
       const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
       // Full-text match, plus a substring match so partial words ("gard") still find things.
-      filters.push(or(sql`${groups.searchVector} @@ ${tsquery}`, ilike(groups.name, containsPattern(input.query)))!);
+      // A word that's the start of a hashtag ("garden" → #gardening) matches too.
+      const asTag = normalizeTag(input.query);
+      filters.push(
+        or(
+          sql`${groups.searchVector} @@ ${tsquery}`,
+          ilike(groups.name, containsPattern(input.query)),
+          asTag ? sql`exists (select 1 from unnest(${groups.tags}) as t(tag) where t.tag like ${prefixPattern(asTag)})` : undefined,
+        )!,
+      );
       order.unshift(desc(sql`ts_rank(${groups.searchVector}, ${tsquery})`));
     }
 

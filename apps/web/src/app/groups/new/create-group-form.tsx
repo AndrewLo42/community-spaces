@@ -20,7 +20,7 @@ export function CreateGroupForm() {
     slug: "",
     description: "",
     rules: "",
-    category: "neighborhood",
+    tags: [],
     accentColor: GROUP_ACCENTS[0],
     visibility: "public",
     joinPolicy: "open",
