@@ -7,6 +7,7 @@ import {
   GROUP_VISIBILITIES,
   IMAGE_CONTENT_TYPES,
   JOIN_POLICIES,
+  MAX_ANNOUNCEMENT_LENGTH,
   MAX_IMAGE_BYTES,
   MAX_POST_IMAGES,
   MEMBER_ROLES,
@@ -262,3 +263,18 @@ export const rsvpInput = z.object({
   eventId: z.string().min(1),
   status: z.enum(RSVP_STATUSES),
 });
+
+// ─── Announcements ───────────────────────────────────────────────────────────
+
+/** Who an announcement goes to: every member of a group, or the people coming to an event. */
+export const announcementAudienceInput = z.union([
+  z.object({ groupId: z.string().min(1) }),
+  z.object({ eventId: z.string().min(1) }),
+]);
+export type AnnouncementAudience = z.infer<typeof announcementAudienceInput>;
+
+export const createAnnouncementInput = announcementAudienceInput.and(
+  z.object({ body: z.string().trim().min(1, "Write a message first").max(MAX_ANNOUNCEMENT_LENGTH) }),
+);
+
+export const setAnnouncementEmailsInput = z.object({ groupId: z.string().min(1), enabled: z.boolean() });

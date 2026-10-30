@@ -1,6 +1,8 @@
 import { formatEventWhen } from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AnnounceButton } from "@/components/announce-button";
+import { AnnouncementList } from "@/components/announcement-list";
 import { Avatar } from "@/components/avatar";
 import { CommentThread } from "@/components/comment-thread";
 import { attendanceSummary, EventDateBadge } from "@/components/event-card";
@@ -28,7 +30,8 @@ function mapHref(location: string) {
 export default async function EventPage({ params }: { params: Params }) {
   const { id } = await params;
   const [event, user] = await Promise.all([loadEvent(id), getSessionUser()]);
-  const comments = await (await serverApi()).comment.list({ eventId: id });
+  const api = await serverApi();
+  const [comments, updates] = await Promise.all([api.comment.list({ eventId: id }), api.announcement.forEvent({ eventId: id })]);
   const map = mapHref(event.location);
   const canAnswer = Object.values(event.viewer.canRsvp).some(Boolean);
 
@@ -43,6 +46,8 @@ export default async function EventPage({ params }: { params: Params }) {
           This event was cancelled.
         </p>
       ) : null}
+
+      <AnnouncementList title="Updates from the organizer" items={updates} viewerId={user?.id ?? null} />
 
       <Card className="space-y-5 p-5 sm:p-6">
         <div className="flex gap-4">
@@ -116,9 +121,12 @@ export default async function EventPage({ params }: { params: Params }) {
           </div>
         ) : null}
 
-        {event.viewer.canManage ? (
-          <div className="border-t border-line pt-5">
-            <EventActions eventId={event.id} title={event.title} goingCount={event.goingCount} />
+        {event.viewer.canManage || event.viewer.canMessage ? (
+          <div className="flex flex-wrap gap-2 border-t border-line pt-5">
+            {event.viewer.canMessage ? (
+              <AnnounceButton audience={{ eventId: event.id }} label="Message everyone coming" variant="primary" />
+            ) : null}
+            {event.viewer.canManage ? <EventActions eventId={event.id} title={event.title} goingCount={event.goingCount} /> : null}
           </div>
         ) : null}
       </Card>

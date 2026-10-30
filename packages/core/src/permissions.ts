@@ -53,6 +53,7 @@ export type GroupAction =
   | "member:ban"
   | "report:review"
   | "invite:manage"
+  | "group:announce" // message every member at once
   | "group:manage"; // can open the manage page at all
 
 export function roleRank(role: MemberRole): number {
@@ -119,6 +120,7 @@ export function can(ctx: PermissionContext, action: GroupAction): boolean {
       return isAtLeast(role, "moderator");
 
     case "invite:manage":
+    case "group:announce":
       return isAtLeast(role, "admin");
   }
 }
@@ -205,6 +207,14 @@ export function canManageEvent(ctx: PermissionContext, event: { createdById: str
 }
 
 /**
+ * Whoever manages an event can message the people coming, until it's over.
+ * That includes after cancelling it, which is when attendees most need to hear.
+ */
+export function canMessageAttendees(ctx: PermissionContext, event: { createdById: string | null; ended: boolean }): boolean {
+  return !event.ended && canManageEvent(ctx, event);
+}
+
+/**
  * Members answer until the event is over. "Going" needs a free spot unless
  * you already have one; "maybe" and "can't go" never take a spot.
  */
@@ -251,6 +261,7 @@ export function groupPermissions(ctx: PermissionContext) {
     moderate: can(ctx, "post:moderate"),
     manage: can(ctx, "group:manage"),
     manageInvites: can(ctx, "invite:manage"),
+    announce: can(ctx, "group:announce"),
   };
 }
 export type GroupPermissions = ReturnType<typeof groupPermissions>;

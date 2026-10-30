@@ -45,6 +45,10 @@ export function describeNotification(n: NotificationSummary): string {
     }
     case "mod_queue":
       return `${group} has new items to review`;
+    case "announcement": {
+      const snippet = n.data?.snippet ?? "";
+      return n.data?.eventTitle ? `Update about ${n.data.eventTitle}: ${snippet}` : `${group}: ${snippet}`;
+    }
   }
 }
 
@@ -58,7 +62,15 @@ export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" 
       return n.postId ? `/p/${n.postId}` : n.eventId ? `/e/${n.eventId}` : "/";
     case "mod_queue":
       return n.groupSlug ? `/g/${n.groupSlug}/manage` : "/";
+    case "announcement":
+      return n.eventId ? `/e/${n.eventId}` : n.groupSlug ? `/g/${n.groupSlug}` : "/";
     default:
       return n.groupSlug ? `/g/${n.groupSlug}` : "/";
   }
+}
+
+/** The first line of a message, cut to fit a notification or subject line. */
+export function messageSnippet(body: string, max = 80): string {
+  const line = body.trim().split("\n")[0]!.trim();
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }

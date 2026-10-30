@@ -80,8 +80,13 @@ export const NOTIFICATION_TYPES = [
   "request_approved",
   "role_changed",
   "mod_queue", // moderators: requests, pending posts or reports to look at
+  "announcement", // from a group's admins, or an event's organizer to its attendees
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** Announcements notify and email everyone, so each group or event gets a few a day at most. */
+export const MAX_ANNOUNCEMENTS_PER_DAY = 3;
+export const MAX_ANNOUNCEMENT_LENGTH = 2000;
 
 export const EMAIL_DIGEST_OPTIONS = ["daily", "weekly", "off"] as const;
 export type EmailDigest = (typeof EMAIL_DIGEST_OPTIONS)[number];

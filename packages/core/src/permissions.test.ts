@@ -9,6 +9,7 @@ import {
   canEditComment,
   canEditPost,
   canManageEvent,
+  canMessageAttendees,
   canModerateMember,
   canReport,
   canRsvp,
@@ -298,5 +299,22 @@ describe("events", () => {
     assert.equal(canRsvp(member, full, "maybe", "going"), false);
     assert.equal(canRsvp(member, full, null, "maybe"), true);
     assert.equal(canRsvp(member, full, "going", "going"), true);
+  });
+});
+
+describe("announcements", () => {
+  it("admins and the owner announce to the whole group", () => {
+    assert.equal(can(ctx({}, { role: "member" }), "group:announce"), false);
+    assert.equal(can(ctx({}, { role: "moderator" }), "group:announce"), false);
+    assert.equal(can(ctx({}, { role: "admin" }), "group:announce"), true);
+    assert.equal(can(ctx({}, { role: "owner" }), "group:announce"), true);
+  });
+
+  it("an event's organizer and moderators message its attendees until it's over", () => {
+    const event = { createdById: "u1", ended: false };
+    assert.equal(canMessageAttendees(ctx({}, { role: "member" }, "u1"), event), true);
+    assert.equal(canMessageAttendees(ctx({}, { role: "member" }, "u2"), event), false);
+    assert.equal(canMessageAttendees(ctx({}, { role: "moderator" }, "u2"), event), true);
+    assert.equal(canMessageAttendees(ctx({}, { role: "member" }, "u1"), { ...event, ended: true }), false);
   });
 });

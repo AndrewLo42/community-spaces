@@ -11,11 +11,19 @@ export interface SessionUser {
   image?: string | null;
 }
 
+/** Emails the API asks the host app to send; the host owns templates, links and the mail provider. */
+export interface Mailer {
+  sendAnnouncement(announcementId: string): Promise<void>;
+}
+
 /** Built per request by the host app (Next.js today, the same server for mobile later). */
 export interface Context {
   db: Db;
   storage: Storage;
   user: SessionUser | null;
+  mailer?: Mailer;
+  /** Runs work after the response is sent (Next's `after`). Without it, work starts immediately and isn't awaited. */
+  after?: (task: () => Promise<void>) => void;
 }
 
 const t = initTRPC.context<Context>().create({

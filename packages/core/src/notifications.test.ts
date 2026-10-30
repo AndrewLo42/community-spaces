@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { describeNotification, notificationHref, type NotificationSummary } from "./notifications";
+import { describeNotification, messageSnippet, notificationHref, type NotificationSummary } from "./notifications";
 
 const base: NotificationSummary = {
   type: "comment",
@@ -45,5 +45,21 @@ describe("notification links", () => {
     assert.equal(notificationHref({ ...onEvent, type: "event_comment" }), "/e/e1");
     assert.equal(notificationHref({ ...onEvent, type: "reply" }), "/e/e1");
     assert.equal(notificationHref({ ...base, type: "post_declined" }), "/g/riverside");
+  });
+});
+
+describe("announcements", () => {
+  const announcement = { ...base, type: "announcement" as const, postId: null, groupName: "Riverside", data: { snippet: "Gate code changed" } };
+  it("reads as the group's message, or an update about an event", () => {
+    assert.equal(describeNotification(announcement), "Riverside: Gate code changed");
+    assert.equal(notificationHref(announcement), "/g/riverside");
+    const update = { ...announcement, eventId: "e1", data: { snippet: "Moved indoors", eventTitle: "Work day" } };
+    assert.equal(describeNotification(update), "Update about Work day: Moved indoors");
+    assert.equal(notificationHref(update), "/e/e1");
+  });
+
+  it("snippets take the first line and trim long ones", () => {
+    assert.equal(messageSnippet("Gate code changed\nIt's 4471 now"), "Gate code changed");
+    assert.equal(messageSnippet("a".repeat(100), 10), "aaaaaaaaa…");
   });
 });

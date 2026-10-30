@@ -2,6 +2,7 @@ import {
   can,
   canCommentOnPost,
   canManageEvent,
+  canMessageAttendees,
   canRsvp,
   createEventInput,
   DEFAULT_EVENT_LENGTH_MS,
@@ -49,6 +50,7 @@ function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | 
     viewer: {
       rsvp,
       canManage: !cancelled && canManageEvent(pc, event),
+      canMessage: canMessageAttendees(pc, { ...event, ended }),
       // Same rule as the thread loader in lib/threads: an event discussion is an open, published thread.
       canComment: canCommentOnPost(pc, { locked: false }),
       /** Which RSVP buttons work right now. */

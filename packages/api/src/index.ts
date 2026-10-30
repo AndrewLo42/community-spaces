@@ -1,3 +1,4 @@
+import { announcementRouter } from "./routers/announcement";
 import { commentRouter } from "./routers/comment";
 import { eventRouter } from "./routers/event";
 import { groupRouter } from "./routers/group";
@@ -17,6 +18,7 @@ export const appRouter = router({
   group: groupRouter,
   post: postRouter,
   comment: commentRouter,
+  announcement: announcementRouter,
   event: eventRouter,
   report: reportRouter,
   invite: inviteRouter,
@@ -29,7 +31,7 @@ export const appRouter = router({
 
 export type AppRouter = typeof appRouter;
 export const createCaller = createCallerFactory(appRouter);
-export type { Context, SessionUser } from "./trpc";
+export type { Context, Mailer, SessionUser } from "./trpc";
 export type { Storage } from "./storage";
 export { deleteUnusedUploads } from "./lib/uploads";
 export type { PostView } from "./lib/posts";

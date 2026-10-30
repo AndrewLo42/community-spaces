@@ -212,6 +212,8 @@ export const memberships = pgTable(
     role: memberRole("role").notNull().default("member"),
     status: membershipStatus("status").notNull().default("active"),
     requestMessage: text("request_message"),
+    /** Whether announcements from this group also arrive by email. In-app notices always arrive. */
+    announcementEmails: boolean("announcement_emails").notNull().default(true),
     ...timestamps,
   },
   (t) => [
@@ -363,6 +365,29 @@ export const eventRsvps = pgTable(
     ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index("event_rsvps_user_idx").on(t.userId)],
+);
+
+/**
+ * A message from a group's admins to every member, or from an event's
+ * organizer to the people going. Each one notifies and emails its audience
+ * once, when sent; the row is what shows on the group or event page after.
+ */
+export const announcements = pgTable(
+  "announcements",
+  {
+    id: id(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    /** Set for event updates; null for group-wide announcements. */
+    eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }),
+    authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    /** How many people it reached when sent, shown to whoever sent it. */
+    recipientCount: integer("recipient_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("announcements_group_idx").on(t.groupId, t.createdAt), index("announcements_event_idx").on(t.eventId, t.createdAt)],
 );
 
 /** Shareable join links. The only way into invite-only and hidden groups. */
