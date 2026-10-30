@@ -1,25 +1,26 @@
-import { canReport, canViewPost, createReportInput } from "@cs/core";
+import { canReport, createReportInput, type CommentThreadRef } from "@cs/core";
 import { and, comments, eq, reports } from "@cs/db";
 import { TRPCError } from "@trpc/server";
-import { loadPostAccess } from "../lib/access";
 import { notifyModQueue } from "../lib/notify";
+import { loadThread, threadOf } from "../lib/threads";
 import { protectedProcedure, router } from "../trpc";
 
 export const reportRouter = router({
   /** Flag a post or comment for the group's moderators. Reports are private to moderators. */
   create: protectedProcedure.input(createReportInput).mutation(async ({ ctx, input }) => {
-    let postId = input.targetId;
-    let authorId: string;
+    // A post is reported as itself; a comment through the post or event it's on.
+    let ref: CommentThreadRef = { postId: input.targetId };
+    let authorId: string | undefined;
     if (input.targetType === "comment") {
       const [comment] = await ctx.db.select().from(comments).where(eq(comments.id, input.targetId));
       if (!comment || comment.status === "removed") throw new TRPCError({ code: "NOT_FOUND" });
-      postId = comment.postId;
+      ref = threadOf(comment);
       authorId = comment.authorId;
     }
 
-    const access = await loadPostAccess(ctx.db, postId, ctx.user.id);
-    if (!access || !canViewPost(access.permissionContext, access.post)) throw new TRPCError({ code: "NOT_FOUND" });
-    authorId ??= access.post.authorId;
+    const access = await loadThread(ctx.db, ref, ctx.user.id);
+    if (!access?.canView) throw new TRPCError({ code: "NOT_FOUND" });
+    authorId ??= access.parent.authorId;
     if (!canReport(access.permissionContext, { authorId })) {
       throw new TRPCError({ code: "FORBIDDEN", message: "You can't report this" });
     }

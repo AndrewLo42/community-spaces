@@ -7,6 +7,7 @@ export interface NotificationEvent {
   groupKey: string;
   groupId: string;
   postId?: string;
+  eventId?: string;
   actorId: string;
   data?: Record<string, string>;
 }
@@ -32,6 +33,7 @@ export async function notify(db: Db, recipientIds: string[], event: Notification
           groupKey: event.groupKey,
           groupId: event.groupId,
           postId: event.postId,
+          eventId: event.eventId,
           actorId: event.actorId,
           actorIds: [event.actorId],
           data: event.data,

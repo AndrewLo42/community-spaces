@@ -73,6 +73,7 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
  */
 export const NOTIFICATION_TYPES = [
   "comment", // on your post
+  "event_comment", // on an event you planned
   "reply", // to your comment
   "post_approved",
   "post_declined",

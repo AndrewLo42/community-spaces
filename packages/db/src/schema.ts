@@ -17,6 +17,7 @@ import {
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   doublePrecision,
   index,
@@ -264,13 +265,16 @@ export const postImages = pgTable(
   (t) => [index("post_images_post_idx").on(t.postId, t.position)],
 );
 
+/**
+ * Comments on a post or on an event (exactly one of the two). Events are
+ * declared further down, so their reference is lazy.
+ */
 export const comments = pgTable(
   "comments",
   {
     id: id(),
-    postId: text("post_id")
-      .notNull()
-      .references(() => posts.id, { onDelete: "cascade" }),
+    postId: text("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    eventId: text("event_id").references((): AnyPgColumn => events.id, { onDelete: "cascade" }),
     authorId: text("author_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -281,7 +285,11 @@ export const comments = pgTable(
     editedAt: timestamp("edited_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("comments_post_idx").on(t.postId, t.createdAt)],
+  (t) => [
+    index("comments_post_idx").on(t.postId, t.createdAt),
+    index("comments_event_idx").on(t.eventId, t.createdAt),
+    check("comments_one_thread", sql`num_nonnulls(${t.postId}, ${t.eventId}) = 1`),
+  ],
 );
 
 export const reports = pgTable(
@@ -335,6 +343,7 @@ export const events = pgTable(
     // Denormalized so event lists never COUNT(*).
     goingCount: integer("going_count").notNull().default(0),
     maybeCount: integer("maybe_count").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -414,6 +423,7 @@ export const notifications = pgTable(
     groupKey: text("group_key").notNull(),
     groupId: text("group_id").references(() => groups.id, { onDelete: "cascade" }),
     postId: text("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    eventId: text("event_id").references((): AnyPgColumn => events.id, { onDelete: "cascade" }),
     /** Most recent actor, plus everyone who contributed to this row. */
     actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
     actorIds: text("actor_ids").array().notNull().default(sql`'{}'::text[]`),
@@ -462,5 +472,6 @@ export const postImagesRelations = relations(postImages, ({ one }) => ({
 
 export const commentsRelations = relations(comments, ({ one }) => ({
   post: one(posts, { fields: [comments.postId], references: [posts.id] }),
+  event: one(events, { fields: [comments.eventId], references: [events.id] }),
   author: one(users, { fields: [comments.authorId], references: [users.id] }),
 }));

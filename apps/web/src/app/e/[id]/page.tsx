@@ -2,10 +2,13 @@ import { formatEventWhen } from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { CommentThread } from "@/components/comment-thread";
 import { attendanceSummary, EventDateBadge } from "@/components/event-card";
 import { EventActions } from "@/components/event-actions";
+import { MarkSeen } from "@/components/mark-seen";
 import { RsvpButtons } from "@/components/rsvp-buttons";
 import { ButtonLink, Card, cx } from "@/components/ui";
+import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
 import { loadEvent } from "./load-event";
 
@@ -25,6 +28,7 @@ function mapHref(location: string) {
 export default async function EventPage({ params }: { params: Params }) {
   const { id } = await params;
   const [event, user] = await Promise.all([loadEvent(id), getSessionUser()]);
+  const comments = await (await serverApi()).comment.list({ eventId: id });
   const map = mapHref(event.location);
   const canAnswer = Object.values(event.viewer.canRsvp).some(Boolean);
 
@@ -121,6 +125,9 @@ export default async function EventPage({ params }: { params: Params }) {
 
       <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
       {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
+
+      {user ? <MarkSeen eventId={event.id} /> : null}
+      <CommentThread thread={{ eventId: event.id }} comments={comments} canComment={event.viewer.canComment} />
     </div>
   );
 }

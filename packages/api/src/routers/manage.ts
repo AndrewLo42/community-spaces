@@ -28,6 +28,7 @@ import {
   count,
   desc,
   eq,
+  events,
   groups,
   ilike,
   inArray,
@@ -282,7 +283,14 @@ export const manageRouter = router({
     const [reportedPosts, reportedComments] = await Promise.all([
       postIds.length
         ? ctx.db
-            .select({ id: posts.id, body: posts.body, status: posts.status, authorName: users.name, postId: posts.id })
+            .select({
+              id: posts.id,
+              body: posts.body,
+              status: posts.status,
+              authorName: users.name,
+              postId: posts.id,
+              eventId: sql<string | null>`null`,
+            })
             .from(posts)
             .innerJoin(users, eq(users.id, posts.authorId))
             .where(inArray(posts.id, postIds))
@@ -295,6 +303,7 @@ export const manageRouter = router({
               status: comments.status,
               authorName: users.name,
               postId: comments.postId,
+              eventId: comments.eventId,
             })
             .from(comments)
             .innerJoin(users, eq(users.id, comments.authorId))
@@ -318,7 +327,7 @@ export const manageRouter = router({
           targetType: g.targetType,
           targetId: g.targetId,
           content: c
-            ? { body: c.body, authorName: c.authorName, postId: c.postId, removed: c.status === "removed" }
+            ? { body: c.body, authorName: c.authorName, postId: c.postId, eventId: c.eventId, removed: c.status === "removed" }
             : null,
           reports: g.reports.map(({ id, reason, details, createdAt, reporterName }) => ({
             id,
@@ -344,9 +353,10 @@ export const manageRouter = router({
         if (post) await removePost(ctx.db, post.id);
       } else {
         const [row] = await ctx.db
-          .select({ comment: comments, groupId: posts.groupId })
+          .select({ comment: comments, groupId: sql<string>`coalesce(${posts.groupId}, ${events.groupId})` })
           .from(comments)
-          .innerJoin(posts, eq(posts.id, comments.postId))
+          .leftJoin(posts, eq(posts.id, comments.postId))
+          .leftJoin(events, eq(events.id, comments.eventId))
           .where(eq(comments.id, input.targetId));
         if (row && row.groupId !== input.groupId) throw new TRPCError({ code: "NOT_FOUND" });
         if (row) await removeComment(ctx.db, row.comment);

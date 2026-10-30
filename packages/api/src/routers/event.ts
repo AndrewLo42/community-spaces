@@ -1,5 +1,6 @@
 import {
   can,
+  canCommentOnPost,
   canManageEvent,
   canRsvp,
   createEventInput,
@@ -41,12 +42,15 @@ function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | 
     capacity: event.capacity,
     goingCount: event.goingCount,
     maybeCount: event.maybeCount,
+    commentCount: event.commentCount,
     spotsLeft: event.capacity === null ? null : Math.max(0, event.capacity - event.goingCount),
     cancelled,
     ended,
     viewer: {
       rsvp,
       canManage: !cancelled && canManageEvent(pc, event),
+      // Same rule as the thread loader in lib/threads: an event discussion is an open, published thread.
+      canComment: canCommentOnPost(pc, { locked: false }),
       /** Which RSVP buttons work right now. */
       canRsvp: Object.fromEntries(RSVP_STATUSES.map((s) => [s, canRsvp(pc, state, rsvp, s)])) as Record<RsvpStatus, boolean>,
     },

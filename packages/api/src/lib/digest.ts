@@ -84,6 +84,7 @@ export async function buildDigest(db: Db, user: DigestUser, now: Date): Promise<
       groupName: groups.name,
       groupSlug: groups.slug,
       postId: notifications.postId,
+      eventId: notifications.eventId,
       data: notifications.data,
     })
     .from(notifications)

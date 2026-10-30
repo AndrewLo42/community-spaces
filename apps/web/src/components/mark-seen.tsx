@@ -6,10 +6,10 @@ import { useTRPC } from "@/trpc/client";
 import { useRefreshNotificationCount } from "./notification-bell";
 
 /**
- * Clears the viewer's notifications about what they're looking at (a post, or
- * a group's review queue), and updates the bell if anything changed.
+ * Clears the viewer's notifications about what they're looking at (a post, an
+ * event, or a group's review queue), and updates the bell if anything changed.
  */
-export function MarkSeen(props: { postId: string } | { modQueueGroupId: string }) {
+export function MarkSeen(props: { postId: string } | { eventId: string } | { modQueueGroupId: string }) {
   const trpc = useTRPC();
   const refreshCount = useRefreshNotificationCount();
   const { mutate } = useMutation(
@@ -19,7 +19,7 @@ export function MarkSeen(props: { postId: string } | { modQueueGroupId: string }
       },
     }),
   );
-  const key = "postId" in props ? `p:${props.postId}` : `m:${props.modQueueGroupId}`;
+  const key = "postId" in props ? `p:${props.postId}` : "eventId" in props ? `e:${props.eventId}` : `m:${props.modQueueGroupId}`;
 
   useEffect(() => {
     mutate(props);

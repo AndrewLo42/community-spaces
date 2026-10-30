@@ -10,6 +10,7 @@ export interface NotificationSummary {
   groupName: string | null;
   groupSlug: string | null;
   postId: string | null;
+  eventId: string | null;
   data: Record<string, string> | null;
 }
 
@@ -25,6 +26,8 @@ export function describeNotification(n: NotificationSummary): string {
   switch (n.type) {
     case "comment":
       return `${actors(n)} commented on your post`;
+    case "event_comment":
+      return n.data?.title ? `${actors(n)} commented on ${n.data.title}` : `${actors(n)} commented on your event`;
     case "reply":
       return `${actors(n)} replied to your comment`;
     case "post_approved":
@@ -46,12 +49,13 @@ export function describeNotification(n: NotificationSummary): string {
 }
 
 /** Where tapping the notification goes. */
-export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" | "groupSlug">): string {
+export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" | "eventId" | "groupSlug">): string {
   switch (n.type) {
     case "comment":
+    case "event_comment":
     case "reply":
     case "post_approved":
-      return n.postId ? `/p/${n.postId}` : "/";
+      return n.postId ? `/p/${n.postId}` : n.eventId ? `/e/${n.eventId}` : "/";
     case "mod_queue":
       return n.groupSlug ? `/g/${n.groupSlug}/manage` : "/";
     default:

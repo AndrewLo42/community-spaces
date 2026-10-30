@@ -1,5 +1,6 @@
 "use client";
 
+import type { CommentThreadRef } from "@cs/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -23,16 +24,17 @@ export interface CommentData {
   canEdit: boolean;
 }
 
+/** The discussion under a post or an event. */
 export function CommentThread({
-  postId,
+  thread,
   comments,
   canComment,
-  locked,
+  locked = false,
 }: {
-  postId: string;
+  thread: CommentThreadRef;
   comments: CommentData[];
   canComment: boolean;
-  locked: boolean;
+  locked?: boolean;
 }) {
   const topLevel = comments.filter((c) => !c.parentId);
   const replies = new Map<string, CommentData[]>();
@@ -50,7 +52,7 @@ export function CommentThread({
       </h2>
 
       {canComment ? (
-        <CommentForm postId={postId} placeholder="Add a comment…" />
+        <CommentForm thread={thread} placeholder="Add a comment…" />
       ) : (
         <p className="text-sm text-muted">
           {locked ? "Comments are locked on this post." : "Only members can comment here."}
@@ -60,12 +62,12 @@ export function CommentThread({
       <ul className="space-y-5">
         {visible.map((c) => (
           <li key={c.id}>
-            <Comment comment={c} postId={postId} canReply={canComment} />
+            <Comment comment={c} thread={thread} canReply={canComment} />
             {replies.get(c.id)?.length ? (
               <ul className="mt-3 space-y-3 border-l-2 border-line pl-4 sm:ml-4">
                 {replies.get(c.id)!.filter((r) => !r.removed).map((r) => (
                   <li key={r.id}>
-                    <Comment comment={r} postId={postId} canReply={canComment} replyToId={c.id} />
+                    <Comment comment={r} thread={thread} canReply={canComment} replyToId={c.id} />
                   </li>
                 ))}
               </ul>
@@ -79,12 +81,12 @@ export function CommentThread({
 
 function Comment({
   comment,
-  postId,
+  thread,
   canReply,
   replyToId,
 }: {
   comment: CommentData;
-  postId: string;
+  thread: CommentThreadRef;
   canReply: boolean;
   /** Replies to a reply go to the thread's top-level comment. */
   replyToId?: string;
@@ -150,7 +152,7 @@ function Comment({
         {replying ? (
           <div className="mt-2">
             <CommentForm
-              postId={postId}
+              thread={thread}
               parentId={replyToId ?? comment.id}
               placeholder={`Reply to ${comment.author?.name || "this comment"}…`}
               autoFocus
@@ -164,13 +166,13 @@ function Comment({
 }
 
 function CommentForm({
-  postId,
+  thread,
   parentId,
   placeholder,
   autoFocus,
   onDone,
 }: {
-  postId: string;
+  thread: CommentThreadRef;
   parentId?: string;
   placeholder: string;
   autoFocus?: boolean;
@@ -187,7 +189,7 @@ function CommentForm({
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate(
-          { postId, parentId, body },
+          { ...thread, parentId, body },
           {
             onSuccess: () => {
               setBody("");

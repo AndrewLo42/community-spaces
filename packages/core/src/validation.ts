@@ -130,11 +130,19 @@ export const postIdInput = z.object({ postId: z.string().min(1) });
 export const postFlagInput = postIdInput.extend({ value: z.boolean() });
 export const reviewPostInput = postIdInput.extend({ approve: z.boolean() });
 
-export const createCommentInput = z.object({
-  postId: z.string().min(1),
-  parentId: z.string().min(1).optional(),
-  body: z.string().trim().min(1, "Write a comment first").max(4000),
-});
+/** Which discussion a comment belongs to: a post's or an event's. */
+export const commentThreadInput = z.union([
+  z.object({ postId: z.string().min(1) }),
+  z.object({ eventId: z.string().min(1) }),
+]);
+export type CommentThreadRef = z.infer<typeof commentThreadInput>;
+
+export const createCommentInput = commentThreadInput.and(
+  z.object({
+    parentId: z.string().min(1).optional(),
+    body: z.string().trim().min(1, "Write a comment first").max(4000),
+  }),
+);
 
 export const commentIdInput = z.object({ commentId: z.string().min(1) });
 
@@ -193,6 +201,7 @@ export const inviteCodeInput = z.object({ code: z.string().trim().min(1).max(64)
 export const notificationListInput = z.object({ cursor: z.string().max(200).optional() });
 export const markSeenInput = z.union([
   z.object({ postId: z.string().min(1) }),
+  z.object({ eventId: z.string().min(1) }),
   z.object({ modQueueGroupId: z.string().min(1) }),
 ]);
 export const markReadInput = z.object({ ids: z.array(z.string().min(1)).min(1).max(100) });

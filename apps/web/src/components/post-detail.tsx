@@ -26,7 +26,7 @@ export async function PostDetail({ postId }: { postId: string }) {
       <PostCard post={post} linkToPost={false} showGroup />
       {signedIn ? <MarkSeen postId={post.id} /> : null}
       {post.status === "published" ? (
-        <CommentThread postId={post.id} comments={comments} canComment={post.viewer.canComment} locked={post.locked} />
+        <CommentThread thread={{ postId: post.id }} comments={comments} canComment={post.viewer.canComment} locked={post.locked} />
       ) : null}
     </div>
   );

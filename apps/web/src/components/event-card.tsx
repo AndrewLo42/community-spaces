@@ -54,7 +54,16 @@ export function EventCard({ event }: { event: EventView }) {
           </div>
           <p className="text-sm text-muted">{formatEventWhen(event)}</p>
           {event.location ? <p className="truncate text-sm text-muted">{event.location}</p> : null}
-          {!event.cancelled ? <p className="text-xs text-muted">{attendanceSummary(event)}</p> : null}
+          {!event.cancelled || event.commentCount > 0 ? (
+            <p className="text-xs text-muted">
+              {[
+                event.cancelled ? null : attendanceSummary(event),
+                event.commentCount > 0 ? `${event.commentCount} ${event.commentCount === 1 ? "comment" : "comments"}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
         </div>
       </Card>
     </Link>

@@ -1,5 +1,5 @@
 import { markReadInput, markSeenInput, notificationListInput, updatePreferencesInput } from "@cs/core";
-import { and, count, desc, eq, groups, inArray, isNull, lt, notifications, posts, users } from "@cs/db";
+import { and, count, desc, eq, events, groups, inArray, isNull, lt, notifications, posts, users } from "@cs/db";
 import { protectedProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 30;
@@ -26,6 +26,8 @@ export const notificationRouter = router({
         data: notifications.data,
         postId: notifications.postId,
         postBody: posts.body,
+        eventId: notifications.eventId,
+        eventTitle: events.title,
         groupSlug: groups.slug,
         groupName: groups.name,
         groupAccent: groups.accentColor,
@@ -33,6 +35,7 @@ export const notificationRouter = router({
       .from(notifications)
       .leftJoin(users, eq(users.id, notifications.actorId))
       .leftJoin(posts, eq(posts.id, notifications.postId))
+      .leftJoin(events, eq(events.id, notifications.eventId))
       .leftJoin(groups, eq(groups.id, notifications.groupId))
       .where(
         and(
@@ -46,7 +49,7 @@ export const notificationRouter = router({
     const page = rows.slice(0, PAGE_SIZE).map(({ actorIds, ...n }) => ({
       ...n,
       actorCount: actorIds.length,
-      postSnippet: n.postBody ? n.postBody.slice(0, 120) : null,
+      postSnippet: n.postBody ? n.postBody.slice(0, 120) : n.eventTitle,
     }));
     const last = page[page.length - 1];
     return { notifications: page, nextCursor: rows.length > PAGE_SIZE && last ? last.updatedAt.toISOString() : null };
@@ -57,12 +60,14 @@ export const notificationRouter = router({
     return { ok: true };
   }),
 
-  /** Opening a post or the manage page clears the notifications about it. */
+  /** Opening a post, an event or the manage page clears the notifications about it. */
   markSeen: protectedProcedure.input(markSeenInput).mutation(async ({ ctx, input }) => {
     const target =
       "postId" in input
         ? eq(notifications.postId, input.postId)
-        : and(eq(notifications.type, "mod_queue"), eq(notifications.groupId, input.modQueueGroupId));
+        : "eventId" in input
+          ? eq(notifications.eventId, input.eventId)
+          : and(eq(notifications.type, "mod_queue"), eq(notifications.groupId, input.modQueueGroupId));
     const updated = await ctx.db
       .update(notifications)
       .set({ readAt: new Date() })

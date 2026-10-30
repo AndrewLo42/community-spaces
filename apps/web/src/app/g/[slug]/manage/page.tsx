@@ -190,8 +190,11 @@ async function ReportsTab({ groupId }: { groupId: string }) {
                 <p className="font-medium">{item.content.authorName || "Member"}</p>
                 <p className="mt-1 line-clamp-4 whitespace-pre-line">{item.content.body || "(photo post)"}</p>
                 <div className="mt-2 flex gap-3 text-xs text-muted">
-                  <Link href={`/p/${item.content.postId}`} className="hover:text-fg">
-                    View in context
+                  <Link
+                    href={item.content.postId ? `/p/${item.content.postId}` : `/e/${item.content.eventId}`}
+                    className="hover:text-fg"
+                  >
+                    {item.content.eventId ? "View on the event" : "View in context"}
                   </Link>
                   {item.content.removed ? <span>Already removed</span> : null}
                 </div>

@@ -9,6 +9,7 @@ const base: NotificationSummary = {
   groupName: "Riverside Garden",
   groupSlug: "riverside",
   postId: "p1",
+  eventId: null,
   data: null,
 };
 
@@ -21,6 +22,10 @@ describe("notification wording", () => {
 
   it("falls back when the actor has no name", () => {
     assert.equal(describeNotification({ ...base, actorName: "" }), "Someone commented on your post");
+    assert.equal(
+      describeNotification({ ...base, type: "event_comment", actorCount: 2, data: { title: "Garden work day" } }),
+      "Maria and 1 other commented on Garden work day",
+    );
   });
 
   it("uses the right article for roles", () => {
@@ -36,6 +41,9 @@ describe("notification links", () => {
   it("goes to the post, the group, or the manage page", () => {
     assert.equal(notificationHref(base), "/p/p1");
     assert.equal(notificationHref({ ...base, type: "mod_queue" }), "/g/riverside/manage");
+    const onEvent = { ...base, postId: null, eventId: "e1" };
+    assert.equal(notificationHref({ ...onEvent, type: "event_comment" }), "/e/e1");
+    assert.equal(notificationHref({ ...onEvent, type: "reply" }), "/e/e1");
     assert.equal(notificationHref({ ...base, type: "post_declined" }), "/g/riverside");
   });
 });
