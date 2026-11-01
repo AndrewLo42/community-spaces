@@ -49,6 +49,10 @@ export function describeNotification(n: NotificationSummary): string {
       const snippet = n.data?.snippet ?? "";
       return n.data?.eventTitle ? `Update about ${n.data.eventTitle}: ${snippet}` : `${group}: ${snippet}`;
     }
+    case "poll": {
+      const question = n.data?.snippet ?? "";
+      return n.data?.eventTitle ? `New poll about ${n.data.eventTitle}: ${question}` : `New poll in ${group}: ${question}`;
+    }
   }
 }
 
@@ -63,6 +67,7 @@ export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" 
     case "mod_queue":
       return n.groupSlug ? `/g/${n.groupSlug}/manage` : "/";
     case "announcement":
+    case "poll":
       return n.eventId ? `/e/${n.eventId}` : n.groupSlug ? `/g/${n.groupSlug}` : "/";
     default:
       return n.groupSlug ? `/g/${n.groupSlug}` : "/";

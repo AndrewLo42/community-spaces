@@ -1,5 +1,27 @@
-import type { AnnouncementAudience } from "@cs/core";
+import { can, canMessageAttendees, eventEnd, type AnnouncementAudience } from "@cs/core";
 import { and, announcements, eq, eventRsvps, events, groups, inArray, memberships, ne, users, type Db } from "@cs/db";
+import { TRPCError } from "@trpc/server";
+import { loadGroupAccess } from "./access";
+
+export const DAY_MS = 24 * 3_600_000;
+
+/**
+ * Loads the group (and event) behind an audience, and whether this user may
+ * message it: admins for a whole group, an event's organizer for its attendees.
+ * Polls go to the same audiences under the same rule.
+ */
+export async function loadAudience(db: Db, audience: AnnouncementAudience, userId: string) {
+  if ("groupId" in audience) {
+    const access = await loadGroupAccess(db, { id: audience.groupId }, userId);
+    if (!access) throw new TRPCError({ code: "NOT_FOUND" });
+    return { ...access, event: null, allowed: can(access.permissionContext, "group:announce") };
+  }
+  const [event] = await db.select().from(events).where(eq(events.id, audience.eventId));
+  const access = event ? await loadGroupAccess(db, { id: event.groupId }, userId) : null;
+  if (!event || !access) throw new TRPCError({ code: "NOT_FOUND" });
+  const ended = eventEnd(event) <= new Date();
+  return { ...access, event, allowed: canMessageAttendees(access.permissionContext, { ...event, ended }) };
+}
 
 /**
  * Everyone an announcement reaches, minus its author: every active member for

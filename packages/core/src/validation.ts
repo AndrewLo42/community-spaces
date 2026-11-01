@@ -8,6 +8,11 @@ import {
   IMAGE_CONTENT_TYPES,
   JOIN_POLICIES,
   MAX_ANNOUNCEMENT_LENGTH,
+  MAX_POLL_OPTION_LENGTH,
+  MAX_POLL_OPTIONS,
+  MAX_POLL_QUESTION_LENGTH,
+  MIN_POLL_OPTIONS,
+  POLL_DURATIONS_DAYS,
   MAX_IMAGE_BYTES,
   MAX_POST_IMAGES,
   MEMBER_ROLES,
@@ -278,3 +283,37 @@ export const createAnnouncementInput = announcementAudienceInput.and(
 );
 
 export const setAnnouncementEmailsInput = z.object({ groupId: z.string().min(1), enabled: z.boolean() });
+
+// ─── Polls ───────────────────────────────────────────────────────────────────
+
+/** A group poll for every member, or an event poll for the people coming. Same audiences as announcements. */
+export const createPollInput = announcementAudienceInput.and(
+  z.object({
+    question: z.string().trim().min(1, "Ask a question first").max(MAX_POLL_QUESTION_LENGTH),
+    options: z
+      .array(z.string().trim().max(MAX_POLL_OPTION_LENGTH))
+      // Blank rows in the form are just unused slots.
+      .transform((options) => options.filter(Boolean))
+      .pipe(
+        z
+          .array(z.string())
+          .min(MIN_POLL_OPTIONS, `Give at least ${MIN_POLL_OPTIONS} choices`)
+          .max(MAX_POLL_OPTIONS, `At most ${MAX_POLL_OPTIONS} choices`)
+          .refine((options) => new Set(options.map((o) => o.toLowerCase())).size === options.length, "Each choice must be different"),
+      ),
+    multiple: z.boolean().default(false),
+    closesInDays: z
+      .number()
+      .refine((d) => (POLL_DURATIONS_DAYS as readonly number[]).includes(d))
+      .nullable()
+      .default(null),
+  }),
+);
+
+/** The viewer's whole answer: one option, several if the poll allows, or none to take a vote back. */
+export const votePollInput = z.object({
+  pollId: z.string().min(1),
+  optionIds: z.array(z.string().min(1)).max(MAX_POLL_OPTIONS),
+});
+
+export const pollIdInput = z.object({ pollId: z.string().min(1) });

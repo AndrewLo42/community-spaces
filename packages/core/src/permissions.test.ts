@@ -9,6 +9,7 @@ import {
   canEditComment,
   canEditPost,
   canManageEvent,
+  canManagePoll,
   canMessageAttendees,
   canModerateMember,
   canReport,
@@ -16,6 +17,8 @@ import {
   canRemoveContent,
   canTransferOwnership,
   canViewPost,
+  canVote,
+  pollClosed,
   type GroupRules,
   type PermissionContext,
 } from "./permissions";
@@ -316,5 +319,39 @@ describe("announcements", () => {
     assert.equal(canMessageAttendees(ctx({}, { role: "member" }, "u2"), event), false);
     assert.equal(canMessageAttendees(ctx({}, { role: "moderator" }, "u2"), event), true);
     assert.equal(canMessageAttendees(ctx({}, { role: "member" }, "u1"), { ...event, ended: true }), false);
+  });
+});
+
+describe("polls", () => {
+  const open = { closed: false, forEvent: false };
+  const outsider = { attending: false, managesEvent: false };
+
+  it("lets active members answer group polls until they close", () => {
+    assert.equal(canVote(ctx({}, { role: "member" }), open, outsider), true);
+    assert.equal(canVote(ctx({}, { role: "member" }), { ...open, closed: true }, outsider), false);
+    assert.equal(canVote(ctx({}, { role: "member", status: "pending" }), open, outsider), false);
+    assert.equal(canVote(ctx({}, null), open, outsider), false);
+  });
+
+  it("keeps event polls to the people coming and whoever runs the event", () => {
+    const poll = { closed: false, forEvent: true };
+    assert.equal(canVote(ctx({}, { role: "member" }), poll, outsider), false);
+    assert.equal(canVote(ctx({}, { role: "member" }), poll, { attending: true, managesEvent: false }), true);
+    assert.equal(canVote(ctx({}, { role: "member" }), poll, { attending: false, managesEvent: true }), true);
+  });
+
+  it("lets the author or a moderator close a poll", () => {
+    assert.equal(canManagePoll(ctx({}, { role: "member" }, "u1"), { authorId: "u1" }), true);
+    assert.equal(canManagePoll(ctx({}, { role: "member" }, "u2"), { authorId: "u1" }), false);
+    assert.equal(canManagePoll(ctx({}, { role: "moderator" }, "u2"), { authorId: "u1" }), true);
+    assert.equal(canManagePoll(ctx({}, { role: "member" }, "u2"), { authorId: null }), false);
+  });
+
+  it("closes at its end time or when closed by hand", () => {
+    const now = new Date("2026-11-01T12:00:00Z");
+    assert.equal(pollClosed({ closedAt: null, closesAt: null }, now), false);
+    assert.equal(pollClosed({ closedAt: null, closesAt: new Date("2026-11-01T13:00:00Z") }, now), false);
+    assert.equal(pollClosed({ closedAt: null, closesAt: now }, now), true);
+    assert.equal(pollClosed({ closedAt: new Date("2026-10-30T00:00:00Z"), closesAt: null }, now), true);
   });
 });

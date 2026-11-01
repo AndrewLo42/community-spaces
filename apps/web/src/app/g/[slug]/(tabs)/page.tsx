@@ -2,6 +2,7 @@ import { formatEventWhen } from "@cs/core";
 import Link from "next/link";
 import { AnnouncementList } from "@/components/announcement-list";
 import { EventDateBadge } from "@/components/event-card";
+import { PollList } from "@/components/poll-card";
 import { PostCard } from "@/components/post-card";
 import { PostComposer } from "@/components/post-composer";
 import { ButtonLink, Card, EmptyState } from "@/components/ui";
@@ -23,9 +24,10 @@ async function GroupFeed({
   needsApproval: boolean;
 }) {
   const api = await serverApi();
-  const [feed, announcements, user] = await Promise.all([
+  const [feed, announcements, polls, user] = await Promise.all([
     api.post.groupFeed({ groupId, cursor }),
     cursor ? [] : api.announcement.recent({ groupId }),
+    cursor ? [] : api.poll.list({ groupId }),
     getSessionUser(),
   ]);
   const isEmpty = feed.posts.length === 0 && feed.pinned.length === 0 && feed.pending.length === 0;
@@ -33,6 +35,7 @@ async function GroupFeed({
   return (
     <>
       <AnnouncementList title="Announcements" items={announcements} viewerId={user?.id ?? null} />
+      <PollList title="Polls" polls={polls} />
       {canPost && !cursor ? <PostComposer groupId={groupId} needsApproval={needsApproval} /> : null}
 
       {feed.pending.length > 0 ? (

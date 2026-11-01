@@ -2,6 +2,7 @@ import { placeLabel, tagLabel } from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AnnounceButton } from "@/components/announce-button";
+import { NewPollButton } from "@/components/new-poll-button";
 import { ButtonLink, Card } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
@@ -62,6 +63,7 @@ export default async function GroupLayout({ params, children }: { params: Params
           </div>
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             {permissions.announce ? <AnnounceButton audience={{ groupId: group.id }} label="Announce" /> : null}
+            {permissions.announce ? <NewPollButton audience={{ groupId: group.id }} /> : null}
             {permissions.manage ? (
               <ButtonLink href={`/g/${group.slug}/manage`} variant="secondary">
                 Manage{attention > 0 ? ` · ${attention} to review` : ""}

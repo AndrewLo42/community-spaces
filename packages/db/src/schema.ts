@@ -390,6 +390,64 @@ export const announcements = pgTable(
   (t) => [index("announcements_group_idx").on(t.groupId, t.createdAt), index("announcements_event_idx").on(t.eventId, t.createdAt)],
 );
 
+/**
+ * A question for a group's members or an event's attendees. Votes are counted
+ * on the options so a poll renders without COUNT(*); who voted for what is
+ * only ever used to show each viewer their own answer.
+ */
+export const polls = pgTable(
+  "polls",
+  {
+    id: id(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    /** Set for event polls; null for group-wide ones. */
+    eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }),
+    authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+    question: text("question").notNull(),
+    /** Whether each voter may pick more than one option. */
+    multiple: boolean("multiple").notNull().default(false),
+    voterCount: integer("voter_count").notNull().default(0),
+    /** When it closes by itself; null = open until closed by hand. */
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("polls_group_idx").on(t.groupId, t.createdAt), index("polls_event_idx").on(t.eventId, t.createdAt)],
+);
+
+export const pollOptions = pgTable(
+  "poll_options",
+  {
+    id: id(),
+    pollId: text("poll_id")
+      .notNull()
+      .references(() => polls.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    position: integer("position").notNull(),
+    voteCount: integer("vote_count").notNull().default(0),
+  },
+  (t) => [index("poll_options_poll_idx").on(t.pollId, t.position)],
+);
+
+export const pollVotes = pgTable(
+  "poll_votes",
+  {
+    pollId: text("poll_id")
+      .notNull()
+      .references(() => polls.id, { onDelete: "cascade" }),
+    optionId: text("option_id")
+      .notNull()
+      .references(() => pollOptions.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.optionId, t.userId] }), index("poll_votes_poll_user_idx").on(t.pollId, t.userId)],
+);
+
 /** Shareable join links. The only way into invite-only and hidden groups. */
 export const invites = pgTable(
   "invites",

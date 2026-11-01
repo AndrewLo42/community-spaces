@@ -215,6 +215,31 @@ export function canMessageAttendees(ctx: PermissionContext, event: { createdById
 }
 
 /**
+ * Group polls are for every active member; an event's polls are for the
+ * people coming (and whoever runs it), the same people its updates reach.
+ */
+export function canVote(
+  ctx: PermissionContext,
+  poll: { closed: boolean; forEvent: boolean },
+  viewer: { attending: boolean; managesEvent: boolean },
+): boolean {
+  if (!activeRole(ctx) || poll.closed) return false;
+  return !poll.forEvent || viewer.attending || viewer.managesEvent;
+}
+
+/** Whoever asked can close or delete a poll, and so can moderators and up. */
+export function canManagePoll(ctx: PermissionContext, poll: { authorId: string | null }): boolean {
+  const role = activeRole(ctx);
+  if (!role) return false;
+  return (poll.authorId !== null && poll.authorId === ctx.userId) || isAtLeast(role, "moderator");
+}
+
+/** A poll is closed once someone closes it or its end time passes. */
+export function pollClosed(poll: { closedAt: Date | null; closesAt: Date | null }, now = new Date()): boolean {
+  return poll.closedAt !== null || (poll.closesAt !== null && poll.closesAt <= now);
+}
+
+/**
  * Members answer until the event is over. "Going" needs a free spot unless
  * you already have one; "maybe" and "can't go" never take a spot.
  */

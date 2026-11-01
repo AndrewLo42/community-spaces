@@ -8,6 +8,8 @@ import { CommentThread } from "@/components/comment-thread";
 import { attendanceSummary, EventDateBadge } from "@/components/event-card";
 import { EventActions } from "@/components/event-actions";
 import { MarkSeen } from "@/components/mark-seen";
+import { NewPollButton } from "@/components/new-poll-button";
+import { PollList } from "@/components/poll-card";
 import { RsvpButtons } from "@/components/rsvp-buttons";
 import { ButtonLink, Card, cx } from "@/components/ui";
 import { serverApi } from "@/server/api";
@@ -31,7 +33,11 @@ export default async function EventPage({ params }: { params: Params }) {
   const { id } = await params;
   const [event, user] = await Promise.all([loadEvent(id), getSessionUser()]);
   const api = await serverApi();
-  const [comments, updates] = await Promise.all([api.comment.list({ eventId: id }), api.announcement.forEvent({ eventId: id })]);
+  const [comments, updates, polls] = await Promise.all([
+    api.comment.list({ eventId: id }),
+    api.announcement.forEvent({ eventId: id }),
+    api.poll.list({ eventId: id }),
+  ]);
   const map = mapHref(event.location);
   const canAnswer = Object.values(event.viewer.canRsvp).some(Boolean);
 
@@ -126,10 +132,13 @@ export default async function EventPage({ params }: { params: Params }) {
             {event.viewer.canMessage ? (
               <AnnounceButton audience={{ eventId: event.id }} label="Message everyone coming" variant="primary" />
             ) : null}
+            {event.viewer.canMessage && !event.cancelled ? <NewPollButton audience={{ eventId: event.id }} label="Start a poll" /> : null}
             {event.viewer.canManage ? <EventActions eventId={event.id} title={event.title} goingCount={event.goingCount} /> : null}
           </div>
         ) : null}
       </Card>
+
+      <PollList title="Polls" polls={polls} />
 
       <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
       {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}

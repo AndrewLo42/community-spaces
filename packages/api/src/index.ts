@@ -6,6 +6,7 @@ import { inviteRouter } from "./routers/invite";
 import { manageRouter } from "./routers/manage";
 import { notificationRouter } from "./routers/notification";
 import { placeRouter } from "./routers/place";
+import { pollRouter } from "./routers/poll";
 import { postRouter } from "./routers/post";
 import { reportRouter } from "./routers/report";
 import { tagRouter } from "./routers/tag";
@@ -20,6 +21,7 @@ export const appRouter = router({
   comment: commentRouter,
   announcement: announcementRouter,
   event: eventRouter,
+  poll: pollRouter,
   report: reportRouter,
   invite: inviteRouter,
   manage: manageRouter,
@@ -36,3 +38,4 @@ export type { Storage } from "./storage";
 export { deleteUnusedUploads } from "./lib/uploads";
 export type { PostView } from "./lib/posts";
 export type { EventView } from "./routers/event";
+export type { PollView } from "./routers/poll";

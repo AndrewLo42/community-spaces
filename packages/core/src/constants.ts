@@ -81,12 +81,22 @@ export const NOTIFICATION_TYPES = [
   "role_changed",
   "mod_queue", // moderators: requests, pending posts or reports to look at
   "announcement", // from a group's admins, or an event's organizer to its attendees
+  "poll", // a new poll for you to answer
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** Announcements notify and email everyone, so each group or event gets a few a day at most. */
 export const MAX_ANNOUNCEMENTS_PER_DAY = 3;
 export const MAX_ANNOUNCEMENT_LENGTH = 2000;
+
+/** Polls notify their whole audience too, so they share the same kind of daily cap. */
+export const MAX_POLLS_PER_DAY = 3;
+export const MIN_POLL_OPTIONS = 2;
+export const MAX_POLL_OPTIONS = 6;
+export const MAX_POLL_QUESTION_LENGTH = 200;
+export const MAX_POLL_OPTION_LENGTH = 80;
+/** How long a poll stays open, in days; null means until someone closes it. */
+export const POLL_DURATIONS_DAYS = [1, 3, 7] as const;
 
 export const EMAIL_DIGEST_OPTIONS = ["daily", "weekly", "off"] as const;
 export type EmailDigest = (typeof EMAIL_DIGEST_OPTIONS)[number];
