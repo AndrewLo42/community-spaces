@@ -28,7 +28,8 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className="min-h-screen font-sans">
+      {/* A full-height column whose main grows, so the footer sits at the bottom of the window on short pages. */}
+      <body className="flex min-h-dvh flex-col font-sans">
         <Providers>
           <header className="border-b border-line bg-surface">
             <div className="mx-auto flex max-w-5xl items-center gap-1 px-4 py-3">
@@ -65,8 +66,8 @@ export default async function RootLayout({
               </div>
             ) : null}
           </header>
-          <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
-          <footer className="mx-auto max-w-5xl px-4 pb-8 pt-4 text-xs text-muted">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+          <footer className="mx-auto w-full max-w-5xl px-4 pb-8 pt-4 text-xs text-muted">
             Town data from{" "}
             <a href="https://www.geonames.org/" className="underline hover:text-fg" rel="noreferrer">
               GeoNames
