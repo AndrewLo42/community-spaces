@@ -8,7 +8,8 @@ export interface NotificationEvent {
   groupId: string;
   postId?: string;
   eventId?: string;
-  actorId: string;
+  /** Who did it; null for messages from the app itself, like reminders. */
+  actorId: string | null;
   data?: Record<string, string>;
 }
 
@@ -35,7 +36,7 @@ export async function notify(db: Db, recipientIds: string[], event: Notification
           postId: event.postId,
           eventId: event.eventId,
           actorId: event.actorId,
-          actorIds: [event.actorId],
+          actorIds: event.actorId ? [event.actorId] : [],
           data: event.data,
         })),
       )
@@ -43,9 +44,13 @@ export async function notify(db: Db, recipientIds: string[], event: Notification
         target: [notifications.userId, notifications.groupKey],
         targetWhere: sql`${notifications.readAt} is null`,
         set: {
-          actorId: event.actorId,
-          // Keep each person once, so "Maria and 2 others" counts people, not comments.
-          actorIds: sql`case when ${event.actorId}::text = any(${notifications.actorIds}) then ${notifications.actorIds} else array_append(${notifications.actorIds}, ${event.actorId}::text) end`,
+          ...(event.actorId
+            ? {
+                actorId: event.actorId,
+                // Keep each person once, so "Maria and 2 others" counts people, not comments.
+                actorIds: sql`case when ${event.actorId}::text = any(${notifications.actorIds}) then ${notifications.actorIds} else array_append(${notifications.actorIds}, ${event.actorId}::text) end`,
+              }
+            : {}),
           data: event.data ?? null,
           updatedAt: new Date(),
         },

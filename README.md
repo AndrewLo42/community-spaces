@@ -64,8 +64,9 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 5. For photos: create an R2 bucket with public access, set the `R2_*` variables, and add a
    CORS rule allowing `PUT` from your site's origin (browsers upload straight to R2).
 
-6. Two daily Vercel Cron jobs (`apps/web/vercel.json`), both protected by `CRON_SECRET`:
+6. Three daily Vercel Cron jobs (`apps/web/vercel.json`), all protected by `CRON_SECRET`:
    - `/api/cron/digest` (15:00 UTC) sends daily and weekly email digests.
+   - `/api/cron/reminders` (16:00 UTC) reminds attendees of events starting within 36 hours.
    - `/api/cron/cleanup` (09:00 UTC) deletes photos uploaded but never used (after 24 hours).
 
    To try one locally: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`

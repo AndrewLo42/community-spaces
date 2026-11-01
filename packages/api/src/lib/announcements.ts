@@ -46,6 +46,16 @@ export async function audienceIds(db: Db, audience: AnnouncementAudience, author
   return (await query).map((r) => r.userId);
 }
 
+/** Of these people, the ones who still want this group's announcement and reminder emails. */
+export async function emailRecipients(db: Db, userIds: string[], groupId: string) {
+  if (userIds.length === 0) return [];
+  return db
+    .select({ id: users.id, email: users.email, name: users.name })
+    .from(users)
+    .innerJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.groupId, groupId)))
+    .where(and(inArray(users.id, userIds), eq(memberships.announcementEmails, true)));
+}
+
 /** What the host needs to email an announcement: the message, where it's from, and who still wants emails. */
 export async function announcementEmail(db: Db, announcementId: string) {
   const [row] = await db
@@ -63,13 +73,7 @@ export async function announcementEmail(db: Db, announcementId: string) {
     announcement.eventId ? { eventId: announcement.eventId } : { groupId: announcement.groupId },
     announcement.authorId ?? "",
   );
-  const recipients = ids.length
-    ? await db
-        .select({ id: users.id, email: users.email, name: users.name })
-        .from(users)
-        .innerJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.groupId, announcement.groupId)))
-        .where(and(inArray(users.id, ids), eq(memberships.announcementEmails, true)))
-    : [];
+  const recipients = await emailRecipients(db, ids, announcement.groupId);
 
   return {
     id: announcement.id,

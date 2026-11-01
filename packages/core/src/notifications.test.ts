@@ -37,6 +37,26 @@ describe("notification wording", () => {
   });
 });
 
+describe("event reminders", () => {
+  const reminder: NotificationSummary = {
+    ...base,
+    type: "event_reminder",
+    actorName: null,
+    actorCount: 0,
+    postId: null,
+    eventId: "e1",
+    data: { title: "Garden work day", when: "Sat, Nov 14 · 9:00 AM PST" },
+  };
+
+  it("names the event and its time, with no actor", () => {
+    assert.equal(describeNotification(reminder), "Coming up: Garden work day, Sat, Nov 14 · 9:00 AM PST");
+  });
+
+  it("links to the event", () => {
+    assert.equal(notificationHref(reminder), "/e/e1");
+  });
+});
+
 describe("notification links", () => {
   it("goes to the post, the group, or the manage page", () => {
     assert.equal(notificationHref(base), "/p/p1");

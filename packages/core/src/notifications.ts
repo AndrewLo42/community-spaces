@@ -53,6 +53,9 @@ export function describeNotification(n: NotificationSummary): string {
       const question = n.data?.snippet ?? "";
       return n.data?.eventTitle ? `New poll about ${n.data.eventTitle}: ${question}` : `New poll in ${group}: ${question}`;
     }
+    case "event_reminder":
+      // The time rather than "tomorrow", so it still reads right whenever it's opened.
+      return `Coming up: ${n.data?.title ?? "an event"}, ${n.data?.when ?? "soon"}`;
   }
 }
 
@@ -61,6 +64,7 @@ export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" 
   switch (n.type) {
     case "comment":
     case "event_comment":
+    case "event_reminder":
     case "reply":
     case "post_approved":
       return n.postId ? `/p/${n.postId}` : n.eventId ? `/e/${n.eventId}` : "/";

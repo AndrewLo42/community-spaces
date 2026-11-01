@@ -5,7 +5,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { useTRPC } from "@/trpc/client";
 
-/** One switch per group: whether its announcements also arrive by email. */
+/** One switch per group: whether its announcements and event reminders also arrive by email. */
 export function AnnouncementEmailsForm({ initial }: { initial: Array<{ groupId: string; name: string; enabled: boolean }> }) {
   const trpc = useTRPC();
   const update = useMutation(trpc.announcement.setEmails.mutationOptions());
@@ -13,10 +13,10 @@ export function AnnouncementEmailsForm({ initial }: { initial: Array<{ groupId: 
 
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-medium">Announcement emails</legend>
+      <legend className="text-sm font-medium">Announcement and reminder emails</legend>
       <p className="text-xs text-muted">
-        Messages from a group's admins, or an organizer to an event's attendees, sent the moment they're posted. They
-        always show up in the app too.
+        Messages from a group's admins, updates from an event's organizer, and a reminder before events you said you'd
+        come to. They always show up in the app too.
       </p>
       {initial.length === 0 ? (
         <p className="text-sm text-muted">Join a group to get its announcements.</p>

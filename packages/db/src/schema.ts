@@ -347,9 +347,14 @@ export const events = pgTable(
     maybeCount: integer("maybe_count").notNull().default(0),
     commentCount: integer("comment_count").notNull().default(0),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /** When attendees were reminded. Cleared if the event moves, so they hear about the new time. */
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("events_group_starts_idx").on(t.groupId, t.startsAt)],
+  (t) => [
+    index("events_group_starts_idx").on(t.groupId, t.startsAt),
+    index("events_reminder_due_idx").on(t.startsAt).where(sql`${t.remindedAt} is null and ${t.cancelledAt} is null`),
+  ],
 );
 
 export const eventRsvps = pgTable(

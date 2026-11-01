@@ -82,6 +82,7 @@ export const NOTIFICATION_TYPES = [
   "mod_queue", // moderators: requests, pending posts or reports to look at
   "announcement", // from a group's admins, or an event's organizer to its attendees
   "poll", // a new poll for you to answer
+  "event_reminder", // an event you said you'd come to is coming up
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

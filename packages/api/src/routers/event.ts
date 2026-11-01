@@ -154,7 +154,11 @@ export const eventRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "Pick a time that hasn't happened yet" });
     }
     // Lowering capacity never bumps anyone; it only stops new "going" answers.
-    await ctx.db.update(events).set(fields).where(eq(events.id, eventId));
+    const moved = fields.startsAt.getTime() !== event.startsAt.getTime();
+    await ctx.db
+      .update(events)
+      .set({ ...fields, ...(moved ? { remindedAt: null } : {}) })
+      .where(eq(events.id, eventId));
     return { id: eventId };
   }),
 

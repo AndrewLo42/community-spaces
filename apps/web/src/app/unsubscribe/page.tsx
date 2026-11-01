@@ -29,7 +29,7 @@ export default async function UnsubscribePage({
         <h1 className="font-serif text-2xl font-semibold">You're unsubscribed</h1>
         <p className="text-sm text-muted">
           {done === "announcements"
-            ? "You won't get announcement emails from that group anymore. They'll still show up in the app."
+            ? "You won't get announcement or reminder emails from that group anymore. They'll still show up in the app."
             : "You won't get summary emails anymore."}{" "}
           You can turn them back on from your {profileLink}.
         </p>
@@ -46,11 +46,11 @@ export default async function UnsubscribePage({
     body = (
       <>
         <h1 className="font-serif text-2xl font-semibold">
-          {group ? `Stop announcement emails from ${group.name}?` : "Stop summary emails?"}
+          {group ? `Stop announcement and reminder emails from ${group.name}?` : "Stop summary emails?"}
         </h1>
         <p className="text-sm text-muted">
           {group
-            ? "You'll stay in the group and still see announcements in the app. This only stops the emails."
+            ? "You'll stay in the group and still see them in the app. This only stops the emails."
             : "You'll still see everything in the app. This only turns off digest emails."}
         </p>
         <form method="post" action="/api/unsubscribe">

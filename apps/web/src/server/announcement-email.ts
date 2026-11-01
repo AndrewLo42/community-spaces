@@ -4,7 +4,7 @@ import { db } from "./db";
 import { sendEmail } from "./email";
 import { oneClickUnsubscribeUrl, unsubscribeUrl } from "./unsubscribe";
 
-const escape = (s: string) =>
+export const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** Absolute links need the public origin; in dev with BETTER_AUTH_URL blank, that's the local server. */
@@ -26,7 +26,7 @@ function render(a: AnnouncementEmail, recipient: { id: string; name: string }, b
     "",
     `Open it: ${href}`,
     "",
-    `Stop announcement emails from ${a.groupName}: ${stop}`,
+    `Stop announcement and reminder emails from ${a.groupName}: ${stop}`,
   ].join("\n");
 
   const html = [
@@ -36,7 +36,7 @@ function render(a: AnnouncementEmail, recipient: { id: string; name: string }, b
     `<p><a href="${href}" style="color:#2f6f5e">Open in Community Spaces</a></p>`,
     `<p style="color:#646b66;font-size:12px;margin-top:32px">You're getting this because you're ${
       a.eventTitle ? `going to ${escape(a.eventTitle)}` : `a member of ${escape(a.groupName)}`
-    }. <a href="${stop}" style="color:#646b66">Stop announcement emails from ${escape(a.groupName)}</a>.</p>`,
+    }. <a href="${stop}" style="color:#646b66">Stop announcement and reminder emails from ${escape(a.groupName)}</a>.</p>`,
     `</div>`,
   ].join("");
 
