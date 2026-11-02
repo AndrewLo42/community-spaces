@@ -1,8 +1,27 @@
+import type { UpcomingEvent } from "@cs/api";
+import { RSVP_LABELS } from "@cs/core";
 import Link from "next/link";
+import { EventRows } from "@/components/event-card";
 import { PostCard } from "@/components/post-card";
-import { ButtonLink, EmptyState } from "@/components/ui";
+import { ButtonLink, Card, cx, EmptyState } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
+
+/** The next few events across your groups, with your answer if you've given one. */
+function ComingUp({ events, className }: { events: UpcomingEvent[]; className: string }) {
+  if (events.length === 0) return null;
+  return (
+    <Card className={cx("space-y-3 p-4 text-sm", className)}>
+      <h2 className="font-semibold">Coming up</h2>
+      <EventRows
+        events={events.map((e) => ({
+          ...e,
+          detail: [e.groupName, e.rsvp ? RSVP_LABELS[e.rsvp] : null].filter(Boolean).join(" · "),
+        }))}
+      />
+    </Card>
+  );
+}
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
   const { cursor } = await searchParams;
@@ -29,7 +48,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   }
 
   const api = await serverApi();
-  const [groups, feed] = await Promise.all([api.group.mine(), api.post.homeFeed({ cursor })]);
+  const [groups, feed, upcoming] = await Promise.all([api.group.mine(), api.post.homeFeed({ cursor }), api.event.upcoming()]);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_17rem]">
@@ -48,6 +67,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             so groups know who you are.
           </p>
         ) : null}
+
+        {/* Phones stack the sidebar under the whole feed, so it goes above the posts there. */}
+        {cursor ? null : <ComingUp events={upcoming.slice(0, 3)} className="lg:hidden" />}
 
         {feed.posts.length === 0 ? (
           <EmptyState title={groups.length === 0 ? "You haven't joined any groups yet" : "Nothing new yet"}>
@@ -73,6 +95,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </div>
 
       <aside className="space-y-3">
+        <ComingUp events={upcoming} className="mb-6 hidden lg:block" />
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted">Your groups</h2>
         {groups.length === 0 ? (
           <p className="text-sm text-muted">None yet.</p>

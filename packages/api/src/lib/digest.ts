@@ -1,4 +1,4 @@
-import { describeNotification, notificationHref, type EmailDigest } from "@cs/core";
+import { describeNotification, formatEventWhen, notificationHref, RSVP_LABELS, type EmailDigest } from "@cs/core";
 import {
   and,
   asc,
@@ -18,6 +18,7 @@ import {
   users,
   type Db,
 } from "@cs/db";
+import { upcomingEvents } from "./upcoming";
 
 const INTERVAL_MS: Record<Exclude<EmailDigest, "off">, number> = {
   // A little under a day / week, so a daily cron that runs a few minutes early still sends.
@@ -26,6 +27,8 @@ const INTERVAL_MS: Record<Exclude<EmailDigest, "off">, number> = {
 };
 const MAX_NOTIFICATIONS = 8;
 const MAX_POSTS_PER_GROUP = 3;
+const MAX_UPCOMING = 5;
+const UPCOMING_WINDOW_MS = 7 * 24 * 3_600_000;
 
 export interface DigestUser {
   id: string;
@@ -63,6 +66,7 @@ export async function dueDigestUsers(db: Db, now: Date, limit: number): Promise<
 export interface Digest {
   notifications: Array<{ text: string; href: string }>;
   moreNotifications: number;
+  upcoming: Array<{ id: string; title: string; when: string; groupName: string; rsvp: string | null }>;
   groups: Array<{
     name: string;
     slug: string;
@@ -137,7 +141,17 @@ export async function buildDigest(db: Db, user: DigestUser, now: Date): Promise<
     .filter((g) => g.newPosts > 0)
     .sort((a, b) => b.newPosts - a.newPosts);
 
-  if (unread.length === 0 && groupsWithPosts.length === 0) return null;
+  const upcoming = await upcomingEvents(db, user.id, {
+    now,
+    limit: MAX_UPCOMING,
+    until: new Date(now.getTime() + UPCOMING_WINDOW_MS),
+  });
+  // A daily digest shouldn't go out just to repeat the same event every day
+  // until it happens. New plans are news; a weekly digest can be a look ahead.
+  const upcomingIsNews =
+    user.emailDigest === "weekly" ? upcoming.length > 0 : upcoming.some((e) => e.createdAt > since && e.createdById !== user.id);
+
+  if (unread.length === 0 && groupsWithPosts.length === 0 && !upcomingIsNews) return null;
 
   return {
     notifications: unread.slice(0, MAX_NOTIFICATIONS).map((n) => {
@@ -145,6 +159,13 @@ export async function buildDigest(db: Db, user: DigestUser, now: Date): Promise<
       return { text: describeNotification(summary), href: notificationHref(summary) };
     }),
     moreNotifications: Math.max(0, unread.length - MAX_NOTIFICATIONS),
+    upcoming: upcoming.map((e) => ({
+      id: e.id,
+      title: e.title,
+      when: formatEventWhen(e, now),
+      groupName: e.groupName,
+      rsvp: e.rsvp ? RSVP_LABELS[e.rsvp] : null,
+    })),
     groups: groupsWithPosts,
   };
 }

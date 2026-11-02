@@ -30,6 +30,30 @@ export function EventDateBadge({
   );
 }
 
+/** One compact line per event, for sidebars. `detail` goes under the time. */
+export function EventRows({
+  events,
+}: {
+  events: Array<{ id: string; title: string; startsAt: Date; endsAt: Date | null; timeZone: string; detail?: string }>;
+}) {
+  return (
+    <ul className="space-y-3">
+      {events.map((e) => (
+        <li key={e.id}>
+          <Link href={`/e/${e.id}`} className="group flex gap-3">
+            <EventDateBadge event={e} size="sm" />
+            <span className="min-w-0">
+              <span className="block truncate font-medium group-hover:underline">{e.title}</span>
+              <span className="block text-xs text-muted">{formatEventWhen(e)}</span>
+              {e.detail ? <span className="block truncate text-xs text-muted">{e.detail}</span> : null}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** "12 going · 3 maybe · 4 spots left" */
 export function attendanceSummary(event: Pick<EventView, "goingCount" | "maybeCount" | "spotsLeft" | "ended">) {
   const parts = [`${event.goingCount} ${event.ended ? "went" : "going"}`];

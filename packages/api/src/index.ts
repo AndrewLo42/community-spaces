@@ -37,5 +37,6 @@ export type { Context, Mailer, SessionUser } from "./trpc";
 export type { Storage } from "./storage";
 export { deleteUnusedUploads } from "./lib/uploads";
 export type { PostView } from "./lib/posts";
+export type { UpcomingEvent } from "./lib/upcoming";
 export type { EventView } from "./routers/event";
 export type { PollView } from "./routers/poll";

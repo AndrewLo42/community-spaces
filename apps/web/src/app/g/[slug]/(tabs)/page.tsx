@@ -1,7 +1,6 @@
-import { formatEventWhen } from "@cs/core";
 import Link from "next/link";
 import { AnnouncementList } from "@/components/announcement-list";
-import { EventDateBadge } from "@/components/event-card";
+import { EventRows } from "@/components/event-card";
 import { PollList } from "@/components/poll-card";
 import { PostCard } from "@/components/post-card";
 import { PostComposer } from "@/components/post-composer";
@@ -95,19 +94,7 @@ async function ComingUp({ groupId, slug, canCreate }: { groupId: string; slug: s
           </Link>
         </p>
       ) : (
-        <ul className="space-y-3">
-          {events.map((e) => (
-            <li key={e.id}>
-              <Link href={`/e/${e.id}`} className="group flex gap-3">
-                <EventDateBadge event={e} size="sm" />
-                <span className="min-w-0">
-                  <span className="block truncate font-medium group-hover:underline">{e.title}</span>
-                  <span className="block truncate text-xs text-muted">{formatEventWhen(e)}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <EventRows events={events} />
       )}
     </Card>
   );

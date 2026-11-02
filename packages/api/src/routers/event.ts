@@ -18,12 +18,12 @@ import { and, asc, desc, eq, eventRsvps, events, inArray, sql, users, type Db } 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess, requireGroupAction } from "../lib/access";
+import { endsAtOrDefault, upcomingEvents } from "../lib/upcoming";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 type EventRow = typeof events.$inferSelect;
 
 /** Over = past its end time, or three hours after it started if it has none. */
-const endsAtOrDefault = sql`coalesce(${events.endsAt}, ${events.startsAt} + make_interval(secs => ${DEFAULT_EVENT_LENGTH_MS / 1000}))`;
 
 /** What the UI needs for one event, including what this viewer can do with it. */
 function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | null, now = new Date()) {
@@ -224,4 +224,7 @@ export const eventRouter = router({
       .limit(3);
     return rows;
   }),
+
+  /** What's coming up across the viewer's groups, for the home page. */
+  upcoming: protectedProcedure.query(({ ctx }) => upcomingEvents(ctx.db, ctx.user.id, { now: new Date(), limit: 5 })),
 });
