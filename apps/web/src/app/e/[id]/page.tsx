@@ -104,6 +104,19 @@ export default async function EventPage({ params }: { params: Params }) {
 
         {event.description ? <p className="whitespace-pre-line text-sm leading-relaxed">{event.description}</p> : null}
 
+        {!event.cancelled && !event.ended ? (
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="text-muted">Add to calendar:</span>
+            <a href={`/e/${event.id}/calendar?to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              Google
+            </a>
+            {/* An .ics file, which Apple Calendar, Outlook and most others open. */}
+            <a href={`/e/${event.id}/calendar`} className="text-accent hover:underline">
+              Apple, Outlook and others
+            </a>
+          </p>
+        ) : null}
+
         {!event.cancelled ? (
           <div className="space-y-3 border-t border-line pt-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
