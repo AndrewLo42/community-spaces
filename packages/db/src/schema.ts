@@ -16,6 +16,7 @@ import {
 } from "@cs/core";
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   customType,
@@ -146,6 +147,17 @@ export const verifications = pgTable(
   },
   (t) => [index("verifications_identifier_idx").on(t.identifier)],
 );
+
+/**
+ * Better Auth's request counters. Kept in the database rather than memory so
+ * the limits hold across serverless instances.
+ */
+export const rateLimits = pgTable("rate_limits", {
+  id: id(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
 
 // ─── Communities ─────────────────────────────────────────────────────────────
 

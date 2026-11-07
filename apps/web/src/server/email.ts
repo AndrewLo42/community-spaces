@@ -6,9 +6,11 @@ interface Email {
   headers?: Record<string, string>;
 }
 
-/** Sends through Resend when configured; otherwise prints to the server log. */
+/** Sends through Resend when configured; otherwise, in dev only, prints to the server log. */
 export async function sendEmail(email: Email): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
+  // A sign-in link in a production log would let anyone who can read the logs sign in as that person.
+  if (!apiKey && process.env.NODE_ENV === "production") throw new Error("RESEND_API_KEY is not set; can't send email");
   if (!apiKey) {
     console.log(`\n[email] To: ${email.to}\n[email] Subject: ${email.subject}\n[email] ${email.text}\n`);
     return;

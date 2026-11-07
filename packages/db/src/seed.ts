@@ -1,9 +1,18 @@
 import { GROUP_ACCENTS, zonedTimeToUtc } from "@cs/core";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { connect } from "./client";
+import { loadRootEnv } from "./env";
 import { comments, eventRsvps, events, groups, memberships, places, posts, users } from "./schema";
 
 // Sample local communities so Discover isn't empty in dev. Safe to re-run.
+
+// Sample groups, fake people and test accounts must never land in a real database.
+loadRootEnv();
+const target = new URL(process.env.DATABASE_URL ?? "postgres://localhost");
+if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(target.hostname) && !process.argv.includes("--not-local")) {
+  console.error(`Refusing to seed ${target.hostname}: sample data is for local databases. Pass --not-local if you mean it.`);
+  process.exit(1);
+}
 
 const { db, close } = connect();
 

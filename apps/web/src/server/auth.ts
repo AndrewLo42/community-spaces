@@ -10,6 +10,16 @@ import { sendEmail } from "./email";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema, usePlural: true }),
+  rateLimit: {
+    // On in production only (Better Auth's default). Shared storage, because
+    // each serverless instance would otherwise count separately.
+    storage: "database",
+    customRules: {
+      // Each request sends an email to any address typed in: keep that from
+      // being used to spam people or burn the sending quota.
+      "/sign-in/magic-link": { window: 15 * 60, max: 5 },
+    },
+  },
   user: {
     additionalFields: {
       bio: { type: "string", required: false, defaultValue: "", input: false },

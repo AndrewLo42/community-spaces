@@ -57,19 +57,56 @@ Sign in with any email. In dev, the magic link is printed in the server terminal
 
 ## Deploying (free tier)
 
-1. Create a Neon project and copy the **pooled** connection string.
-2. Import the repo on Vercel with root directory `apps/web`.
-3. Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`.
-4. Run `DATABASE_URL=… pnpm db:migrate` and `DATABASE_URL=… pnpm db:places` once against Neon.
-5. For photos: create an R2 bucket with public access, set the `R2_*` variables, and add a
-   CORS rule allowing `PUT` from your site's origin (browsers upload straight to R2).
+In production the app checks its settings at startup and refuses to run if any are missing,
+listing all of them in the error (see `apps/web/src/server/env.ts`). Every variable in
+`.env.example` is required there.
 
-6. Three daily Vercel Cron jobs (`apps/web/vercel.json`), all protected by `CRON_SECRET`:
+**Accounts to create first**
+
+1. **Neon** (Postgres). You'll use two connection strings: the **pooled** one for the app, and
+   the **direct** (unpooled) one for migrations.
+2. **Resend.** Add and verify your sending domain (DNS records), then create an API key.
+   `EMAIL_FROM` must use that domain, e.g. `Community Spaces <hello@yourdomain.com>`.
+   Without a verified domain, Resend only delivers to your own address, so nobody else could sign in.
+3. **Cloudflare R2.** Create a bucket with public access (an `r2.dev` URL or a custom domain),
+   an API token with read and write access to it, and a CORS rule allowing `PUT` with the
+   `Content-Type` header from your site's origin (browsers upload straight to R2).
+
+**Database (from your machine, once, then after every new migration)**
+
+```bash
+DATABASE_URL="<neon direct string>" pnpm db:migrate
+DATABASE_URL="<neon direct string>" pnpm db:places
+```
+
+Run migrations *before* deploying code that needs them. `pnpm db:seed` refuses to run against
+anything but a local database; sample groups and test accounts don't belong in production.
+
+**Vercel**
+
+1. Import the repo with root directory `apps/web`.
+2. Set, for Production: `DATABASE_URL` (Neon **pooled**), `BETTER_AUTH_SECRET`
+   (`openssl rand -base64 32`), `BETTER_AUTH_URL` (your https site URL, no trailing slash),
+   `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET` (`openssl rand -base64 32`) and the five `R2_*` values.
+3. Sign-in links point at `BETTER_AUTH_URL`, so preview deployments on other URLs can't sign
+   anyone in. Test sign-in on the production URL (or a second Vercel project for staging).
+4. Three daily Vercel Cron jobs (`apps/web/vercel.json`), all protected by `CRON_SECRET`.
+   On Hobby, Vercel may run each one up to an hour after its scheduled time.
    - `/api/cron/digest` (15:00 UTC) sends daily and weekly email digests.
    - `/api/cron/reminders` (16:00 UTC) reminds attendees of events starting within 36 hours.
    - `/api/cron/cleanup` (09:00 UTC) deletes photos uploaded but never used (after 24 hours).
 
    To try one locally: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/digest`
+
+**After the first deploy, check by hand**
+
+- Sign in with your own email: the link arrives, and opens signed in.
+- Create a group and a post with a photo (R2 upload and display).
+- Post an announcement and check that members get the email, with a working unsubscribe link.
+- In Vercel, run each cron job once from the Cron Jobs tab and check its JSON response.
+
+Sign-in requests are rate limited (5 sign-in emails per 15 minutes per IP address), with the
+counts kept in the database so they hold across serverless instances.
 
 Vercel's Hobby plan is non-commercial. Move to Pro once the app makes money.
 
