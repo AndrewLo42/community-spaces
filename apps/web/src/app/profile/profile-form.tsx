@@ -25,7 +25,7 @@ export function ProfileForm({ initial }: { initial: { name: string; bio: string;
       }}
     >
       <Field label="Name" error={errors.name}>
-        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Alex Rivera" />
+        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
       <Field
         label="Town"
