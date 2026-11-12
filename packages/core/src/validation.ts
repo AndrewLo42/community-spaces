@@ -86,6 +86,8 @@ export const discoverGroupsInput = z.object({
   query: z.string().trim().max(200).optional(),
   /** Only groups within `radius` miles of this place, nearest first. */
   near: placeIdSchema.optional(),
+  /** Only groups without a town, which are online-only. Ignored when `near` is set. */
+  online: z.boolean().optional(),
   radius: z.union(RADIUS_OPTIONS_MILES.map((r) => z.literal(r)) as [z.ZodLiteral<RadiusMiles>, ...z.ZodLiteral<RadiusMiles>[]]).default(DEFAULT_RADIUS_MILES),
   cursor: z.number().int().min(0).default(0),
 });

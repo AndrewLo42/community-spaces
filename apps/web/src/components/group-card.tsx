@@ -1,4 +1,4 @@
-import { formatDistance, placeLabel, tagLabel, type PlaceSummary } from "@cs/core";
+import { formatDistance, groupWhere, tagLabel, type PlaceSummary } from "@cs/core";
 import Link from "next/link";
 
 export interface GroupCardData {
@@ -37,14 +37,12 @@ export function GroupCard({
       <div className="space-y-2 p-4">
         <h3 className="font-serif text-lg font-semibold leading-snug group-hover:underline">{group.name}</h3>
         <p className="line-clamp-2 text-sm text-muted">{group.description || "No description yet."}</p>
-        {group.place ? (
-          <p className="text-xs font-medium text-fg">
-            {placeLabel(group.place)}
-            {group.distanceMiles != null ? (
-              <span className="font-normal text-muted"> · {formatDistance(group.distanceMiles)} away</span>
-            ) : null}
-          </p>
-        ) : null}
+        <p className="text-xs font-medium text-fg">
+          {groupWhere(group.place)}
+          {group.distanceMiles != null ? (
+            <span className="font-normal text-muted"> · {formatDistance(group.distanceMiles)} away</span>
+          ) : null}
+        </p>
         {group.tags.length > 0 ? (
           // Plain text here: the whole card is already a link to the group.
           <p className="flex flex-wrap gap-x-2 text-xs text-accent">

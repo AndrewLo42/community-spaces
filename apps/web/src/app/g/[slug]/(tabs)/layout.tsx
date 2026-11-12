@@ -1,4 +1,4 @@
-import { placeLabel, tagLabel } from "@cs/core";
+import { groupWhere, tagLabel } from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AnnounceButton } from "@/components/announce-button";
@@ -28,7 +28,7 @@ export default async function GroupLayout({ params, children }: { params: Params
   const { slug } = await params;
   const [{ group, membership, permissions }, user] = await Promise.all([loadGroup(slug), getSessionUser()]);
   const attention = permissions.manage ? await needsAttention(group.id) : 0;
-  const details = [group.place ? placeLabel(group.place) : null, group.visibility !== "public" ? group.visibility : null]
+  const details = [groupWhere(group.place), group.visibility !== "public" ? group.visibility : null]
     .filter(Boolean)
     .join(" · ");
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { parseSearch, placeLabel, tagLabel, type PlaceSummary } from "@cs/core";
+import { groupWhere, parseSearch, tagLabel, type PlaceSummary } from "@cs/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
@@ -141,7 +141,7 @@ export function DiscoverSearchBox({ defaultValue }: { defaultValue?: string }) {
                     <span className="size-2.5 shrink-0 rounded-full" style={{ background: o.accentColor }} />
                     <span className="truncate">{o.name}</span>
                   </span>
-                  {o.place ? <span className="shrink-0 text-xs text-muted">{placeLabel(o.place)}</span> : null}
+                  <span className="shrink-0 text-xs text-muted">{groupWhere(o.place)}</span>
                 </>
               )}
             </li>

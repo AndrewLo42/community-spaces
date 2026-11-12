@@ -11,7 +11,7 @@ import { GroupCard } from "@/components/group-card";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
-import { DiscoverSearchForm } from "./search-form";
+import { DiscoverSearchForm, type DiscoverScope } from "./search-form";
 
 export const metadata: Metadata = { title: "Discover" };
 
@@ -26,29 +26,34 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
     : DEFAULT_RADIUS_MILES;
 
   const api = await serverApi();
-  // No ?near= means "near my town" when the viewer has set one; ?near=any means anywhere.
+  // No ?near= means "near my town" when the viewer has set one, else anywhere.
+  // ?near=online is groups without a town; ?near=any is every group.
   let near: PlaceSummary | null = null;
-  if (params.near && params.near !== "any") {
+  if (params.near && params.near !== "any" && params.near !== "online") {
     near = (await api.place.byId({ id: Number(params.near) }).catch(() => null)) ?? null;
   } else if (!params.near && (await getSessionUser())) {
     near = (await api.user.me())?.place ?? null;
   }
 
-  const { groups, nextCursor } = await api.group.discover({ query, cursor, near: near?.id, radius });
+  const scope: DiscoverScope = !near && params.near === "online" ? "online" : "any";
+  const online = !near && scope === "online";
+
+  const { groups, nextCursor } = await api.group.discover({ query, cursor, near: near?.id, online, radius });
 
   const moreHref = (() => {
     const sp = new URLSearchParams();
     if (query) sp.set("q", query);
-    sp.set("near", near ? String(near.id) : "any");
+    sp.set("near", near ? String(near.id) : scope);
     if (near) sp.set("radius", String(radius));
     if (nextCursor) sp.set("cursor", String(nextCursor));
     return `/discover?${sp}`;
   })();
-  const anywhere = (() => {
-    const sp = new URLSearchParams({ near: "any" });
+  const searchIn = (where: DiscoverScope) => {
+    const sp = new URLSearchParams({ near: where });
     if (query) sp.set("q", query);
     return `/discover?${sp}`;
-  })();
+  };
+  const anywhere = searchIn("any");
 
   return (
     <div className="space-y-6">
@@ -57,23 +62,42 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
         <p className="mt-1 text-sm text-muted">Find the people near you who care about the same things.</p>
       </div>
 
-      <DiscoverSearchForm query={query} near={near} radius={radius} />
+      <DiscoverSearchForm query={query} near={near} scope={scope} radius={radius} />
 
-      {near ? (
-        <p className="text-sm text-muted">
-          Groups within {radius} mi of <span className="font-medium text-fg">{placeLabel(near)}</span>, nearest first ·{" "}
-          <Link href={anywhere} className="underline hover:text-fg">
-            Search anywhere
-          </Link>
-        </p>
-      ) : null}
+      {/* Always say where results come from, so nobody wonders why a group is missing. */}
+      <p className="text-sm text-muted">
+        {near ? (
+          <>
+            Groups within {radius} mi of <span className="font-medium text-fg">{placeLabel(near)}</span>, nearest first ·{" "}
+            <Link href={anywhere} className="underline hover:text-fg">
+              Search anywhere
+            </Link>
+          </>
+        ) : online ? (
+          <>
+            <span className="font-medium text-fg">Online groups</span>, ones that don't meet in a town ·{" "}
+            <Link href={anywhere} className="underline hover:text-fg">
+              Include local groups
+            </Link>
+          </>
+        ) : (
+          <>
+            <span className="font-medium text-fg">All groups</span>, local and online · Pick a town to see what's nearby, or{" "}
+            <Link href={searchIn("online")} className="underline hover:text-fg">
+              only online groups
+            </Link>
+          </>
+        )}
+      </p>
 
       {groups.length === 0 ? (
         <EmptyState
           title={
             near
               ? `No groups${describe(query)} within ${radius} mi of ${placeLabel(near)}`
-              : query
+              : online
+                ? `No online groups${describe(query)}`
+                : query
                 ? `No groups${describe(query)}`
                 : "No groups here yet"
           }
@@ -84,7 +108,15 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
               <Link href={anywhere} className="underline">
                 search anywhere
               </Link>
-              . Groups without a location only show up in anywhere searches.
+              . Online groups show up under Online or Anywhere.
+            </p>
+          ) : online ? (
+            <p>
+              Local groups aren't included here.{" "}
+              <Link href={anywhere} className="underline">
+                Search anywhere
+              </Link>{" "}
+              to see them too.
             </p>
           ) : null}
           <p className="mt-2">Can't find yours?</p>

@@ -11,29 +11,44 @@ import { cx } from "./ui";
  * "portland, or" suggests towns, biggest first; only a suggestion can be
  * chosen, so every saved location is a real place with coordinates.
  * `name` adds a hidden input with the place id, for plain GET forms.
+ *
+ * `presets` are fixed choices offered before anything is typed (Discover's
+ * "Online" and "Anywhere"). The chosen one is `preset`, shown in the box when
+ * no town is picked; `emptyPreset` is the one clearing the box falls back to.
  */
+export type PlacePreset = { key: string; label: string; hint?: string };
+
 export function PlacePicker({
   value,
   onChange,
   name,
   placeholder = "Start typing a town…",
   ariaLabel = "Town",
+  presets,
+  preset = null,
+  onPreset,
+  emptyPreset,
 }: {
   value: PlaceSummary | null;
   onChange: (place: PlaceSummary | null) => void;
   name?: string;
   placeholder?: string;
   ariaLabel?: string;
+  presets?: PlacePreset[];
+  preset?: string | null;
+  onPreset?: (key: string) => void;
+  emptyPreset?: string;
 }) {
   const trpc = useTRPC();
   const listId = useId();
-  const [text, setText] = useState(value ? placeLabel(value) : "");
+  const shownLabel = value ? placeLabel(value) : (presets?.find((p) => p.key === preset)?.label ?? "");
+  const [text, setText] = useState(shownLabel);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState("");
 
   // Keep the box in sync when the chosen place changes from outside.
-  useEffect(() => setText(value ? placeLabel(value) : ""), [value]);
+  useEffect(() => setText(shownLabel), [shownLabel]);
 
   // Wait for a pause in typing before asking the server.
   useEffect(() => {
@@ -41,17 +56,35 @@ export function PlacePicker({
     return () => clearTimeout(t);
   }, [text]);
 
-  const typing = open && query.length >= 2 && query !== (value ? placeLabel(value) : "");
+  const typing = open && query.length >= 2 && query !== shownLabel;
   const { data: suggestions = [], isFetching } = useQuery(
     trpc.place.search.queryOptions({ query: query || "x" }, { enabled: typing, staleTime: 60_000 }),
   );
   const shown = typing ? suggestions : [];
+  // Before anything is typed (or once the box is cleared), offer the presets.
+  const offered = open && !typing ? (presets ?? []) : [];
+  type Item = { kind: "place"; place: (typeof suggestions)[number] } | { kind: "preset"; preset: PlacePreset };
+  const items: Item[] = typing
+    ? shown.map((place) => ({ kind: "place", place }))
+    : offered.map((p) => ({ kind: "preset", preset: p }));
+  const itemId = (item: Item) => `${listId}-${item.kind === "place" ? item.place.id : item.preset.key}`;
 
   function choose(place: PlaceSummary | null) {
     onChange(place);
-    setText(place ? placeLabel(place) : "");
+    if (!place && emptyPreset) onPreset?.(emptyPreset);
+    setText(place ? placeLabel(place) : (presets?.find((p) => p.key === emptyPreset)?.label ?? ""));
     setOpen(false);
   }
+
+  function pick(item: Item) {
+    if (item.kind === "place") return choose(item.place);
+    onChange(null);
+    onPreset?.(item.preset.key);
+    setText(item.preset.label);
+    setOpen(false);
+  }
+
+  const clearable = value !== null || (preset !== null && preset !== emptyPreset);
 
   return (
     <div className="relative">
@@ -60,10 +93,10 @@ export function PlacePicker({
         type="text"
         role="combobox"
         aria-label={ariaLabel}
-        aria-expanded={shown.length > 0}
+        aria-expanded={items.length > 0 || typing}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={shown[highlight] ? `${listId}-${shown[highlight]!.id}` : undefined}
+        aria-activedescendant={items[highlight] ? itemId(items[highlight]!) : undefined}
         autoComplete="off"
         value={text}
         placeholder={placeholder}
@@ -72,30 +105,47 @@ export function PlacePicker({
           setText(e.target.value);
           setOpen(true);
           setHighlight(0);
-          if (!e.target.value.trim()) onChange(null);
+          if (!e.target.value.trim() && value) onChange(null);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => {
+          setOpen(true);
+          setHighlight(0);
+          // Typing replaces the current choice rather than adding to it.
+          if (presets) e.target.select();
+        }}
+        onClick={(e) => {
+          // Clicking back into a box that kept focus after a pick: reopen and select, as on focus.
+          if (!presets || open) return;
+          setOpen(true);
+          setHighlight(0);
+          e.currentTarget.select();
+        }}
         onBlur={() => {
-          // Typed text that wasn't picked from the list snaps back to the saved choice.
           setOpen(false);
-          setText(value ? placeLabel(value) : "");
+          // A cleared box falls back to the empty preset; other typing that wasn't picked snaps back.
+          if (!text.trim() && !value && emptyPreset) {
+            onPreset?.(emptyPreset);
+            setText(presets?.find((p) => p.key === emptyPreset)?.label ?? "");
+          } else {
+            setText(shownLabel);
+          }
         }}
         onKeyDown={(e) => {
-          if (e.key === "ArrowDown" && shown.length) {
+          if (e.key === "ArrowDown" && items.length) {
             e.preventDefault();
-            setHighlight((h) => (h + 1) % shown.length);
-          } else if (e.key === "ArrowUp" && shown.length) {
+            setHighlight((h) => (h + 1) % items.length);
+          } else if (e.key === "ArrowUp" && items.length) {
             e.preventDefault();
-            setHighlight((h) => (h - 1 + shown.length) % shown.length);
-          } else if (e.key === "Enter" && shown[highlight]) {
+            setHighlight((h) => (h - 1 + items.length) % items.length);
+          } else if (e.key === "Enter" && items[highlight]) {
             e.preventDefault();
-            choose(shown[highlight]!);
+            pick(items[highlight]!);
           } else if (e.key === "Escape") {
             setOpen(false);
           }
         }}
       />
-      {value ? (
+      {clearable ? (
         <button
           type="button"
           aria-label="Clear location"
@@ -106,30 +156,37 @@ export function PlacePicker({
           ×
         </button>
       ) : null}
-      {typing ? (
+      {items.length > 0 || typing ? (
         <ul
           id={listId}
           role="listbox"
           className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-lg"
         >
-          {shown.map((p, i) => (
+          {items.map((item, i) => (
             <li
-              key={p.id}
-              id={`${listId}-${p.id}`}
+              key={itemId(item)}
+              id={itemId(item)}
               role="option"
               aria-selected={i === highlight}
               className={cx("cursor-pointer px-3 py-2 text-sm", i === highlight && "bg-surface-2")}
               // mousedown, so the input's blur doesn't close the list before the click lands
               onMouseDown={(e) => {
                 e.preventDefault();
-                choose(p);
+                pick(item);
               }}
               onMouseEnter={() => setHighlight(i)}
             >
-              {p.label}
+              {item.kind === "place" ? (
+                item.place.label
+              ) : (
+                <>
+                  <span className={cx(item.preset.key === preset && !value && "font-medium")}>{item.preset.label}</span>
+                  {item.preset.hint ? <span className="block text-xs text-muted">{item.preset.hint}</span> : null}
+                </>
+              )}
             </li>
           ))}
-          {shown.length === 0 ? (
+          {typing && shown.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted">{isFetching ? "Searching…" : "No US towns match"}</li>
           ) : null}
         </ul>

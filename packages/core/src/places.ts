@@ -24,6 +24,11 @@ export function placeLabel(place: Pick<PlaceSummary, "name" | "state">): string 
   return `${place.name}, ${place.state}`;
 }
 
+/** Where a group meets: its town, or "Online" for groups that didn't set one. */
+export function groupWhere(place: Pick<PlaceSummary, "name" | "state"> | null | undefined): string {
+  return place ? placeLabel(place) : "Online";
+}
+
 /** Search radii offered in Discover, in miles. */
 export const RADIUS_OPTIONS_MILES = [10, 25, 50, 100] as const;
 export type RadiusMiles = (typeof RADIUS_OPTIONS_MILES)[number];

@@ -9,7 +9,7 @@ import {
   normalizeTag,
   parseSearch,
 } from "@cs/core";
-import { and, asc, between, desc, eq, groups, ilike, inArray, memberships, ne, or, places, posts, sql } from "@cs/db";
+import { and, asc, between, desc, eq, groups, ilike, inArray, isNull, memberships, ne, or, places, posts, sql } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess } from "../lib/access";
@@ -73,6 +73,7 @@ export const groupRouter = router({
   /**
    * Search and browse. With `near`, only groups within `radius` miles of that
    * town are returned, nearest first; groups without a location drop out.
+   * With `online` instead, only groups without a location.
    */
   discover: publicProcedure.input(discoverGroupsInput).query(async ({ ctx, input }) => {
     const filters = [ne(groups.visibility, "hidden")];
@@ -100,6 +101,8 @@ export const groupRouter = router({
         sql`${distance} <= ${input.radius}`,
       );
       order.unshift(asc(distance));
+    } else if (input.online) {
+      filters.push(isNull(groups.placeId));
     }
 
     const rows = await ctx.db
