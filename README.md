@@ -1,7 +1,7 @@
 # Community Spaces
 
 A calm home for local communities: find groups, join them, read posts, comment.
-No algorithm, no follower counts.
+No algorithm, no follower counts. Just a place to find your hobby home.
 
 ## Stack
 
