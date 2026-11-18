@@ -29,6 +29,7 @@ const openPublic: GroupRules = {
   postPolicy: "members",
   commentPolicy: "members",
   eventPolicy: "members",
+  invitePolicy: "admins",
 };
 
 function ctx(
@@ -258,6 +259,20 @@ describe("moderation", () => {
     assert.equal(can(ctx({}, { role: "admin" }), "invite:manage"), true);
     assert.equal(can(ctx({}, { role: "moderator" }), "group:manage"), true);
     assert.equal(can(ctx({}, { role: "member" }), "group:manage"), false);
+  });
+
+  it("invite links come from admins, or from any member when the group allows it", () => {
+    assert.equal(can(ctx({}, { role: "member" }), "invite:create"), false);
+    assert.equal(can(ctx({}, { role: "moderator" }), "invite:create"), false);
+    assert.equal(can(ctx({}, { role: "admin" }), "invite:create"), true);
+    const membersInvite = { invitePolicy: "members" as const, visibility: "hidden" as const, joinPolicy: "invite" as const };
+    assert.equal(can(ctx(membersInvite, { role: "member" }), "invite:create"), true);
+    assert.equal(can(ctx(membersInvite, { role: "member", status: "pending" }), "invite:create"), false);
+    assert.equal(can(ctx(membersInvite, { role: "member", status: "banned" }), "invite:create"), false);
+    assert.equal(can(ctx(membersInvite), "invite:create"), false);
+    assert.equal(can(ctx(membersInvite, null, null), "invite:create"), false);
+    // Seeing and revoking everyone's links stays with admins.
+    assert.equal(can(ctx(membersInvite, { role: "member" }), "invite:manage"), false);
   });
 
   it("role changes require outranking both the target and the new role", () => {

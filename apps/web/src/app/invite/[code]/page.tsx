@@ -6,11 +6,13 @@ import { ButtonLink, Card } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { AcceptInviteButton } from "./accept-button";
 
-export const metadata: Metadata = { title: "You're invited" };
+// Invite pages name the group, so keep them out of search engines.
+export const metadata: Metadata = { title: "You're invited", robots: { index: false, follow: false } };
 
 const unavailable = {
   expired: "This invite link has expired.",
-  revoked: "This invite link was turned off by the group's admins.",
+  revoked: "This invite link was turned off.",
+  inactive: "This invite link no longer works.",
   "used-up": "This invite link has already been used the maximum number of times.",
 } as const;
 
@@ -24,11 +26,26 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
     throw e;
   }
   const { group, viewer, status } = invite;
+  const askAgain = " Ask whoever sent it for a new one.";
+  // A dead link to a secret group says nothing about the group.
+  if (!group) {
+    return (
+      <div className="mx-auto max-w-md py-10">
+        <Card className="space-y-2 p-6 text-center">
+          <h1 className="font-serif text-2xl font-semibold">This invite isn't available</h1>
+          <p className="text-sm text-muted">
+            {unavailable[status]}
+            {askAgain}
+          </p>
+        </Card>
+      </div>
+    );
+  }
   if (viewer.membershipStatus === "active") redirect(`/g/${group.slug}`);
 
   let action: React.ReactNode;
   if (status !== "valid") {
-    action = <p className="text-sm text-muted">{unavailable[status]} Ask an admin for a new one.</p>;
+    action = <p className="text-sm text-muted">{unavailable[status]}{askAgain}</p>;
   } else if (!viewer.signedIn) {
     action = <ButtonLink href={`/sign-in?next=${encodeURIComponent(`/invite/${code}`)}`}>Sign in to join</ButtonLink>;
   } else if (viewer.membershipStatus === "banned") {

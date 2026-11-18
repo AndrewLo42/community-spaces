@@ -2,10 +2,12 @@
 
 import {
   GROUP_ACCENTS,
+  GROUP_VISIBILITY_LABELS,
   type CommentPolicy,
   type EventPolicy,
   type CreateGroupInput,
   type GroupVisibility,
+  type InvitePolicy,
   type JoinPolicy,
   type PlaceSummary,
   type PostPolicy,
@@ -25,9 +27,13 @@ interface Option<T extends string> {
 }
 
 const visibilityOptions: Option<GroupVisibility>[] = [
-  { value: "public", label: "Public", description: "Anyone can find it and read posts." },
-  { value: "private", label: "Private", description: "Anyone can find it; only members read posts." },
-  { value: "hidden", label: "Hidden", description: "Unlisted. Members join by invite only." },
+  { value: "public", label: GROUP_VISIBILITY_LABELS.public, description: "Anyone can find it and read posts." },
+  { value: "private", label: GROUP_VISIBILITY_LABELS.private, description: "Anyone can find it; only members read posts." },
+  {
+    value: "hidden",
+    label: GROUP_VISIBILITY_LABELS.hidden,
+    description: "Not in Discover or search. Only people with an invite link can find it or join.",
+  },
 ];
 
 const joinOptions: Option<JoinPolicy>[] = [
@@ -47,6 +53,11 @@ const commentOptions: Option<CommentPolicy>[] = [
   { value: "admins", label: "Admins only", description: "Comments are limited to admins." },
 ];
 
+const inviteOptions: Option<InvitePolicy>[] = [
+  { value: "admins", label: "Admins only", description: "Admins and the owner make invite links." },
+  { value: "members", label: "Any member", description: "Members can invite people they know. Admins can turn any link off." },
+];
+
 const eventOptions: Option<EventPolicy>[] = [
   { value: "members", label: "All members", description: "Any member can put a meetup on the calendar." },
   { value: "admins", label: "Admins only", description: "Admins and the owner plan events; members RSVP." },
@@ -58,6 +69,7 @@ export function GroupSettingsFields<T extends GroupSettings>({
   errors,
   afterName,
   initialPlace = null,
+  savedVisibility,
 }: {
   value: T;
   onChange: (next: T) => void;
@@ -66,6 +78,8 @@ export function GroupSettingsFields<T extends GroupSettings>({
   afterName?: React.ReactNode;
   /** The saved location, so the picker can show its name. */
   initialPlace?: PlaceSummary | null;
+  /** The visibility as saved, so leaving Secret can warn what that exposes. Absent when creating. */
+  savedVisibility?: GroupVisibility;
 }) {
   const set = <K extends keyof GroupSettings>(key: K, v: T[K]) => onChange({ ...value, [key]: v });
   const [place, setPlace] = useState<PlaceSummary | null>(initialPlace);
@@ -144,6 +158,13 @@ export function GroupSettingsFields<T extends GroupSettings>({
           value={value.visibility}
           onChange={(v) => onChange({ ...value, visibility: v, joinPolicy: v === "hidden" ? "invite" : value.joinPolicy })}
         />
+        {savedVisibility === "hidden" && value.visibility !== "hidden" ? (
+          <p className="rounded-lg border border-danger/40 bg-danger/5 p-3 text-sm" role="alert">
+            {value.visibility === "public"
+              ? "Once saved, anyone can find this group and read everything posted in it, including past posts."
+              : "Once saved, anyone can find this group and see its name, description and member count. Posts stay members-only."}
+          </p>
+        ) : null}
         <OptionGroup
           label="Who can join"
           options={joinOptions}
@@ -158,6 +179,12 @@ export function GroupSettingsFields<T extends GroupSettings>({
           options={commentOptions}
           value={value.commentPolicy}
           onChange={(v) => set("commentPolicy", v)}
+        />
+        <OptionGroup
+          label="Who can make invite links"
+          options={inviteOptions}
+          value={value.invitePolicy}
+          onChange={(v) => set("invitePolicy", v)}
         />
         <OptionGroup label="Who can plan events" options={eventOptions} value={value.eventPolicy} onChange={(v) => set("eventPolicy", v)} />
       </section>

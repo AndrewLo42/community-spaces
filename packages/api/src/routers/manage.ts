@@ -383,7 +383,14 @@ export const manageRouter = router({
     await requireGroupAction(ctx.db, input.groupId, ctx.user.id, "group:editSettings");
     await assertPlace(ctx.db, input.placeId);
     const { groupId, ...settings } = input;
-    await ctx.db.update(groups).set(settings).where(eq(groups.id, groupId));
+    await ctx.db.transaction(async (tx) => {
+      await tx.update(groups).set(settings).where(eq(groups.id, groupId));
+      // Requests only make sense while the group takes them. Otherwise they'd sit
+      // unanswerable, so drop them quietly, the same as declining.
+      if (settings.joinPolicy !== "request") {
+        await tx.delete(memberships).where(and(eq(memberships.groupId, groupId), eq(memberships.status, "pending")));
+      }
+    });
     return { ok: true };
   }),
 

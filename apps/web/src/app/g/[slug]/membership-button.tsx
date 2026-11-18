@@ -14,6 +14,7 @@ export function MembershipButton({
   canJoin,
   canRequest,
   canLeave,
+  secret = false,
 }: {
   groupId: string;
   signedIn: boolean;
@@ -21,6 +22,8 @@ export function MembershipButton({
   canJoin: boolean;
   canRequest: boolean;
   canLeave: boolean;
+  /** A secret group can't be found again, so leaving asks first. */
+  secret?: boolean;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -41,7 +44,14 @@ export function MembershipButton({
     );
   } else if (status === "active") {
     action = canLeave ? (
-      <Button variant="secondary" disabled={busy} onClick={() => leave.mutate({ groupId })}>
+      <Button
+        variant="secondary"
+        disabled={busy}
+        onClick={() => {
+          if (secret && !confirm("Leave this group? It's secret, so you'll need a new invite link to come back.")) return;
+          leave.mutate({ groupId });
+        }}
+      >
         Leave group
       </Button>
     ) : null;

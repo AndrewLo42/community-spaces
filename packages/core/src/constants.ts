@@ -15,6 +15,12 @@ export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
  */
 export const GROUP_VISIBILITIES = ["public", "private", "hidden"] as const;
 export type GroupVisibility = (typeof GROUP_VISIBILITIES)[number];
+/** What people see. "hidden" is shown as Secret; the stored value stays "hidden". */
+export const GROUP_VISIBILITY_LABELS: Record<GroupVisibility, string> = {
+  public: "Public",
+  private: "Private",
+  hidden: "Secret",
+};
 
 /** open – join instantly · request – admins approve · invite – invite link only */
 export const JOIN_POLICIES = ["open", "request", "invite"] as const;
@@ -34,6 +40,12 @@ export type CommentPolicy = (typeof COMMENT_POLICIES)[number];
 /** Who can put events on the group's calendar. admins – admins and the owner. */
 export const EVENT_POLICIES = ["members", "admins"] as const;
 export type EventPolicy = (typeof EVENT_POLICIES)[number];
+
+/** Who can make invite links. admins – admins and the owner (who can also see and revoke every link). */
+export const INVITE_POLICIES = ["admins", "members"] as const;
+export type InvitePolicy = (typeof INVITE_POLICIES)[number];
+/** Live invite links one member can hold in a group at once. */
+export const MAX_ACTIVE_INVITES_PER_MEMBER = 10;
 
 export const RSVP_STATUSES = ["going", "maybe", "not_going"] as const;
 export type RsvpStatus = (typeof RSVP_STATUSES)[number];

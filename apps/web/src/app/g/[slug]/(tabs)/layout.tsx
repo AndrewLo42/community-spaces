@@ -1,7 +1,8 @@
-import { groupWhere, tagLabel } from "@cs/core";
+import { GROUP_VISIBILITY_LABELS, groupWhere, tagLabel } from "@cs/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AnnounceButton } from "@/components/announce-button";
+import { InviteButton } from "@/components/invite-button";
 import { NewPollButton } from "@/components/new-poll-button";
 import { ButtonLink, Card } from "@/components/ui";
 import { serverApi } from "@/server/api";
@@ -28,7 +29,7 @@ export default async function GroupLayout({ params, children }: { params: Params
   const { slug } = await params;
   const [{ group, membership, permissions }, user] = await Promise.all([loadGroup(slug), getSessionUser()]);
   const attention = permissions.manage ? await needsAttention(group.id) : 0;
-  const details = [groupWhere(group.place), group.visibility !== "public" ? group.visibility : null]
+  const details = [groupWhere(group.place), group.visibility !== "public" ? GROUP_VISIBILITY_LABELS[group.visibility] : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -62,6 +63,9 @@ export default async function GroupLayout({ params, children }: { params: Params
             </p>
           </div>
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+            {permissions.invite && membership?.status === "active" ? (
+              <InviteButton groupId={group.id} groupName={group.name} />
+            ) : null}
             {permissions.announce ? <AnnounceButton audience={{ groupId: group.id }} label="Announce" /> : null}
             {permissions.announce ? <NewPollButton audience={{ groupId: group.id }} /> : null}
             {permissions.manage ? (
@@ -76,6 +80,7 @@ export default async function GroupLayout({ params, children }: { params: Params
               canJoin={permissions.join}
               canRequest={permissions.requestJoin}
               canLeave={permissions.leave}
+              secret={group.visibility === "hidden"}
             />
           </div>
         </div>
