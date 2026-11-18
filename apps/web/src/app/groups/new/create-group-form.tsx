@@ -41,6 +41,7 @@ export function CreateGroupForm({ host }: { host: string }) {
     postPolicy: "members",
     commentPolicy: "members",
     eventPolicy: "members",
+    invitePolicy: "admins",
     placeId: null,
   });
 

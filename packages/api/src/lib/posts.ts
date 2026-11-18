@@ -30,6 +30,7 @@ export function findPosts(db: Db, where: SQL | undefined, limit?: number) {
           postPolicy: true,
           commentPolicy: true,
           eventPolicy: true,
+          invitePolicy: true,
         },
       },
     },

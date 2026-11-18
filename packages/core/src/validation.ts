@@ -3,6 +3,7 @@ import {
   COMMENT_POLICIES,
   EMAIL_DIGEST_OPTIONS,
   EVENT_POLICIES,
+  INVITE_POLICIES,
   GROUP_ACCENTS,
   GROUP_VISIBILITIES,
   IMAGE_CONTENT_TYPES,
@@ -70,11 +71,12 @@ export const groupSettingsInput = z
     postPolicy: z.enum(POST_POLICIES).default("members"),
     commentPolicy: z.enum(COMMENT_POLICIES).default("members"),
     eventPolicy: z.enum(EVENT_POLICIES).default("members"),
+    invitePolicy: z.enum(INVITE_POLICIES).default("admins"),
     /** null = no location (online groups). */
     placeId: placeIdSchema.nullable().default(null),
   })
   .refine((g) => g.visibility !== "hidden" || g.joinPolicy === "invite", {
-    message: "Hidden groups can only be joined by invite",
+    message: "Secret groups can only be joined by invite",
     path: ["joinPolicy"],
   });
 
