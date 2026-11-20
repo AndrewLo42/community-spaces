@@ -149,7 +149,9 @@ export default async function EventPage({ params, searchParams }: { params: Para
               <p className="text-xs text-muted">
                 {event.sharing.code
                   ? "Anyone with the link can see this event, but not the rest of the group."
-                  : `Only members of ${event.group.name} can open this link.`}
+                  : event.sharing.canChange
+                    ? `Only members of ${event.group.name} can open this link. To invite others, create an invite link below.`
+                    : `Only members of ${event.group.name} can open this link.`}
               </p>
             ) : null}
           </div>
@@ -183,7 +185,13 @@ export default async function EventPage({ params, searchParams }: { params: Para
             ) : null}
             {event.viewer.canMessage && !event.cancelled ? <NewPollButton audience={{ eventId: event.id }} label="Start a poll" /> : null}
             {event.sharing?.canChange && !event.cancelled ? (
-              <EventSharing eventId={event.id} code={event.sharing.code} showLocation={event.sharing.showLocation} groupVisibility={event.group.visibility} />
+              <EventSharing
+                eventId={event.id}
+                code={event.sharing.code}
+                showLocation={event.sharing.showLocation}
+                groupName={event.group.name}
+                groupVisibility={event.group.visibility}
+              />
             ) : null}
             {event.viewer.canManage ? <EventActions eventId={event.id} title={event.title} goingCount={event.goingCount} /> : null}
           </div>
