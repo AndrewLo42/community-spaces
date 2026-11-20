@@ -338,7 +338,7 @@ function GuestEventPage({
         {!event.cancelled ? (
           <div className="space-y-2 border-t border-line pt-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-semibold">{event.ended ? "This event is over" : "Want to come?"}</h2>
+              <h2 className="font-semibold">{event.ended ? "This event is over" : event.viewer.rsvp ? "Your RSVP" : "Want to come?"}</h2>
               <p className="text-sm text-muted">{attendanceSummary(event)}</p>
             </div>
             {event.ended ? null : signedIn ? (
