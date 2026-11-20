@@ -359,6 +359,14 @@ export const events = pgTable(
     maybeCount: integer("maybe_count").notNull().default(0),
     commentCount: integer("comment_count").notNull().default(0),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /**
+     * Lets people outside a private or secret group open the event with
+     * /e/[id]?s=code. null = members only. Turning it off and on again makes
+     * a new code, so old links stop working.
+     */
+    shareCode: text("share_code").unique(),
+    /** Whether that shared page shows the address and online link. */
+    shareLocation: boolean("share_location").notNull().default(true),
     /** When attendees were reminded. Cleared if the event moves, so they hear about the new time. */
     remindedAt: timestamp("reminded_at", { withTimezone: true }),
     ...timestamps,

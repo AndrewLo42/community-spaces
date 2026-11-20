@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   can,
   canCommentOnPost,
@@ -69,12 +70,26 @@ async function viewerRsvps(db: Db, eventIds: string[], userId: string | null) {
   return new Map(rows.map((r) => [r.eventId, r.status]));
 }
 
-/** Loads an event with its group's access context, or throws NOT_FOUND if the viewer can't read the group. */
-async function loadEventAccess(db: Db, eventId: string, userId: string | null) {
+/**
+ * Loads an event with its group's access context, or throws NOT_FOUND if the
+ * viewer can't read the group. A matching share code lets someone outside a
+ * private or secret group see that one event as a guest (never someone the
+ * group banned). Only byId takes a share code; everything else is for members.
+ */
+async function loadEventAccess(db: Db, eventId: string, userId: string | null, shareCode?: string) {
   const [event] = await db.select().from(events).where(eq(events.id, eventId));
   const access = event ? await loadGroupAccess(db, { id: event.groupId }, userId) : null;
-  if (!event || !access || !can(access.permissionContext, "group:read")) throw new TRPCError({ code: "NOT_FOUND" });
-  return { event, ...access };
+  if (!event || !access) throw new TRPCError({ code: "NOT_FOUND" });
+  if (can(access.permissionContext, "group:read")) return { event, ...access, guest: false };
+  const shared =
+    shareCode !== undefined && event.shareCode !== null && shareCode === event.shareCode && access.membership?.status !== "banned";
+  if (!shared) throw new TRPCError({ code: "NOT_FOUND" });
+  return { event, ...access, guest: true };
+}
+
+/** Who may turn link sharing on: whoever manages the event, in groups that aren't already public. */
+function canShareEvent(pc: PermissionContext, event: EventRow) {
+  return pc.group.visibility !== "public" && canManageEvent(pc, event);
 }
 
 export const eventRouter = router({
@@ -102,17 +117,21 @@ export const eventRouter = router({
   }),
 
   /** One event with its group, organizer and who's coming. */
-  byId: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  byId: publicProcedure.input(z.object({ eventId: z.string(), share: z.string().max(64).optional() })).query(async ({ ctx, input }) => {
     const userId = ctx.user?.id ?? null;
-    const { event, group, permissionContext } = await loadEventAccess(ctx.db, input.eventId, userId);
+    const { event, group, permissionContext, guest } = await loadEventAccess(ctx.db, input.eventId, userId, input.share);
+    // A guest of a secret group learns about this event, not who's in the group.
+    const secretGuest = guest && group.visibility === "hidden";
 
-    const [organizer] = event.createdById
+    const [organizer] = event.createdById && !secretGuest
       ? await ctx.db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, event.createdById))
       : [];
     const rsvp = (await viewerRsvps(ctx.db, [event.id], userId)).get(event.id) ?? null;
     // Event links get shared beyond the group, so who's coming is for members
     // and fellow attendees; everyone else sees only the counts.
-    const attendeesVisible = permissionContext.membership?.status === "active" || rsvp === "going" || rsvp === "maybe";
+    const attendeesVisible = !guest && (permissionContext.membership?.status === "active" || rsvp === "going" || rsvp === "maybe");
+    const view = toEventView(event, permissionContext, rsvp);
+    const locationHidden = guest && !event.shareLocation && (event.location !== "" || event.link !== "");
     const attendees = attendeesVisible
       ? await ctx.db
           .select({ id: users.id, name: users.name, image: users.image, status: eventRsvps.status })
@@ -124,8 +143,22 @@ export const eventRouter = router({
       : [];
 
     return {
-      ...toEventView(event, permissionContext, rsvp),
-      group: { id: group.id, slug: group.slug, name: group.name, accentColor: group.accentColor, visibility: group.visibility },
+      ...view,
+      ...(locationHidden ? { location: "", link: "" } : {}),
+      group: secretGuest
+        ? { id: group.id, slug: null, name: "A private group", accentColor: group.accentColor, visibility: group.visibility }
+        : { id: group.id, slug: group.slug as string | null, name: group.name, accentColor: group.accentColor, visibility: group.visibility },
+      guest,
+      locationHidden,
+      /** Present when the event can be shared beyond the group; members and guests holding it get the code. */
+      sharing:
+        group.visibility === "public"
+          ? null
+          : {
+              code: event.shareCode,
+              showLocation: event.shareLocation,
+              canChange: !guest && canShareEvent(permissionContext, event),
+            },
       organizer: organizer ?? null,
       attendeesVisible,
       going: attendees.filter((a) => a.status === "going"),
@@ -175,6 +208,20 @@ export const eventRouter = router({
     if (!event.cancelledAt) await ctx.db.update(events).set({ cancelledAt: new Date() }).where(eq(events.id, event.id));
     return { id: event.id };
   }),
+
+  /**
+   * Turns the outside-the-group link on or off. Turning it off forgets the
+   * code, so links already sent stop working; turning it on again makes a new one.
+   */
+  setSharing: protectedProcedure
+    .input(z.object({ eventId: z.string(), enabled: z.boolean(), showLocation: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const { event, permissionContext } = await loadEventAccess(ctx.db, input.eventId, ctx.user.id);
+      if (!canShareEvent(permissionContext, event)) throw new TRPCError({ code: "FORBIDDEN" });
+      const shareCode = input.enabled ? (event.shareCode ?? randomBytes(9).toString("base64url")) : null;
+      await ctx.db.update(events).set({ shareCode, shareLocation: input.showLocation }).where(eq(events.id, event.id));
+      return { code: shareCode };
+    }),
 
   rsvp: protectedProcedure.input(rsvpInput).mutation(async ({ ctx, input }) => {
     const access = await loadEventAccess(ctx.db, input.eventId, ctx.user.id);

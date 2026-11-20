@@ -8,12 +8,23 @@ import { Button, Input } from "./ui";
  * otherwise copies the link. If the browser won't allow copying, the link
  * shows up selected so it can be copied by hand.
  */
-export function ShareEventButton({ eventId, title, when }: { eventId: string; title: string; when: string }) {
+export function ShareEventButton({
+  eventId,
+  shareCode,
+  title,
+  when,
+}: {
+  eventId: string;
+  /** The private-group share code, when link sharing is on. */
+  shareCode: string | null;
+  title: string;
+  when: string;
+}) {
   const [copied, setCopied] = useState(false);
   const [manual, setManual] = useState<string | null>(null);
 
   async function share() {
-    const url = `${window.location.origin}/e/${eventId}`;
+    const url = `${window.location.origin}/e/${eventId}${shareCode ? `?s=${shareCode}` : ""}`;
     if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
       try {
         await navigator.share({ title, text: `${title} · ${when}`, url });

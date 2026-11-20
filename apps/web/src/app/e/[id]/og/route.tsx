@@ -1,18 +1,25 @@
 import { eventDateBadge, formatEventWhen } from "@cs/core";
+import { TRPCError } from "@trpc/server";
 import { ImageResponse } from "next/og";
-import { loadEvent } from "./load-event";
+import { serverApi } from "@/server/api";
 
 // The card shown when an event link is pasted into a chat or a post. It goes
 // through the same access check as the page, so link-preview bots (which are
-// signed out) only ever get an image for events in public groups.
-export const alt = "Event details";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+// signed out) only get an image for public-group events, or for a shared
+// link's event when the link carries its ?s= code.
+const size = { width: 1200, height: 630 };
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 
-export default async function Image({ params }: { params: Promise<{ id: string }> }) {
-  const event = await loadEvent((await params).id);
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const share = new URL(req.url).searchParams.get("s") ?? undefined;
+  let event;
+  try {
+    event = await (await serverApi()).event.byId({ eventId: (await params).id, share });
+  } catch (e) {
+    if (e instanceof TRPCError && e.code === "NOT_FOUND") return new Response("Not found", { status: 404 });
+    throw e;
+  }
   const { month, day } = eventDateBadge(event);
   const accent = event.group.accentColor;
 
@@ -54,6 +61,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      // A shared private event's card stops showing as soon as the link is turned off.
+      headers: { "Cache-Control": event.group.visibility === "public" ? "public, max-age=300" : "private, no-store" },
+    },
   );
 }
