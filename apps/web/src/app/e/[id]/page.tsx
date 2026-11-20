@@ -11,6 +11,7 @@ import { MarkSeen } from "@/components/mark-seen";
 import { NewPollButton } from "@/components/new-poll-button";
 import { PollList } from "@/components/poll-card";
 import { RsvpButtons } from "@/components/rsvp-buttons";
+import { ShareEventButton } from "@/components/share-event-button";
 import { ButtonLink, Card, cx } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
@@ -20,7 +21,16 @@ type Params = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const event = await loadEvent((await params).id);
-  return { title: event.title, description: `${formatEventWhen(event)} · ${event.group.name}` };
+  const description = [formatEventWhen(event), event.location, event.group.name].filter(Boolean).join(" · ");
+  // The preview image comes from opengraph-image.tsx next to this file.
+  return {
+    title: event.title,
+    description,
+    openGraph: { type: "website", title: event.title, description, siteName: "Community Spaces" },
+    twitter: { card: "summary_large_image", title: event.title, description },
+    // Members-only events don't belong in search results even if a link leaks.
+    ...(event.group.visibility === "public" ? {} : { robots: { index: false, follow: false } }),
+  };
 }
 
 /** A map search for free-text places; "Online" and friends aren't on a map. */
@@ -40,6 +50,7 @@ export default async function EventPage({ params }: { params: Params }) {
   ]);
   const map = mapHref(event.location);
   const canAnswer = Object.values(event.viewer.canRsvp).some(Boolean);
+  const when = formatEventWhen(event);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -74,7 +85,7 @@ export default async function EventPage({ params }: { params: Params }) {
         <dl className="space-y-2 text-sm">
           <div className="flex gap-3">
             <dt className="w-14 shrink-0 text-muted">When</dt>
-            <dd>{formatEventWhen(event)}</dd>
+            <dd>{when}</dd>
           </div>
           {event.location ? (
             <div className="flex gap-3">
@@ -105,16 +116,24 @@ export default async function EventPage({ params }: { params: Params }) {
         {event.description ? <p className="whitespace-pre-line text-sm leading-relaxed">{event.description}</p> : null}
 
         {!event.cancelled && !event.ended ? (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="text-muted">Add to calendar:</span>
-            <a href={`/e/${event.id}/calendar?to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-              Google
-            </a>
-            {/* An .ics file, which Apple Calendar, Outlook and most others open. */}
-            <a href={`/e/${event.id}/calendar`} className="text-accent hover:underline">
-              Apple, Outlook and others
-            </a>
-          </p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <ShareEventButton eventId={event.id} title={event.title} when={when} />
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-muted">Add to calendar:</span>
+                <a href={`/e/${event.id}/calendar?to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  Google
+                </a>
+                {/* An .ics file, which Apple Calendar, Outlook and most others open. */}
+                <a href={`/e/${event.id}/calendar`} className="text-accent hover:underline">
+                  Apple, Outlook and others
+                </a>
+              </span>
+            </div>
+            {event.group.visibility !== "public" ? (
+              <p className="text-xs text-muted">Only members of {event.group.name} can open this link.</p>
+            ) : null}
+          </div>
         ) : null}
 
         {!event.cancelled ? (
@@ -153,8 +172,14 @@ export default async function EventPage({ params }: { params: Params }) {
 
       <PollList title="Polls" polls={polls} />
 
-      <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
-      {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
+      {event.attendeesVisible ? (
+        <>
+          <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
+          {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
+        </>
+      ) : event.goingCount + event.maybeCount > 0 ? (
+        <p className="text-sm text-muted">Members of {event.group.name} can see who's coming.</p>
+      ) : null}
 
       {user ? <MarkSeen eventId={event.id} /> : null}
       <CommentThread thread={{ eventId: event.id }} comments={comments} canComment={event.viewer.canComment} />

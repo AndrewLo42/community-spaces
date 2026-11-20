@@ -109,19 +109,25 @@ export const eventRouter = router({
     const [organizer] = event.createdById
       ? await ctx.db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, event.createdById))
       : [];
-    const attendees = await ctx.db
-      .select({ id: users.id, name: users.name, image: users.image, status: eventRsvps.status })
-      .from(eventRsvps)
-      .innerJoin(users, eq(users.id, eventRsvps.userId))
-      .where(and(eq(eventRsvps.eventId, event.id), inArray(eventRsvps.status, ["going", "maybe"])))
-      .orderBy(asc(eventRsvps.createdAt))
-      .limit(500);
     const rsvp = (await viewerRsvps(ctx.db, [event.id], userId)).get(event.id) ?? null;
+    // Event links get shared beyond the group, so who's coming is for members
+    // and fellow attendees; everyone else sees only the counts.
+    const attendeesVisible = permissionContext.membership?.status === "active" || rsvp === "going" || rsvp === "maybe";
+    const attendees = attendeesVisible
+      ? await ctx.db
+          .select({ id: users.id, name: users.name, image: users.image, status: eventRsvps.status })
+          .from(eventRsvps)
+          .innerJoin(users, eq(users.id, eventRsvps.userId))
+          .where(and(eq(eventRsvps.eventId, event.id), inArray(eventRsvps.status, ["going", "maybe"])))
+          .orderBy(asc(eventRsvps.createdAt))
+          .limit(500)
+      : [];
 
     return {
       ...toEventView(event, permissionContext, rsvp),
-      group: { id: group.id, slug: group.slug, name: group.name, accentColor: group.accentColor },
+      group: { id: group.id, slug: group.slug, name: group.name, accentColor: group.accentColor, visibility: group.visibility },
       organizer: organizer ?? null,
+      attendeesVisible,
       going: attendees.filter((a) => a.status === "going"),
       maybe: attendees.filter((a) => a.status === "maybe"),
     };

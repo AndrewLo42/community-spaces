@@ -11,6 +11,8 @@ import { Providers } from "@/trpc/client";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // Link previews need absolute image URLs.
+  metadataBase: new URL(process.env.BETTER_AUTH_URL || `http://localhost:${process.env.PORT ?? 3000}`),
   title: { default: "Community Spaces", template: "%s · Community Spaces" },
   description: "A calm home for local communities.",
 };
