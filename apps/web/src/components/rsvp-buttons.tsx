@@ -10,10 +10,13 @@ import { cx } from "./ui";
 /** Going / Maybe / Can't go. The current answer is highlighted; a full event disables Going for newcomers. */
 export function RsvpButtons({
   eventId,
+  share,
   current,
   allowed,
 }: {
   eventId: string;
+  /** The share code a guest came in with, for events in private groups. */
+  share?: string | null;
   current: RsvpStatus | null;
   allowed: Record<RsvpStatus, boolean>;
 }) {
@@ -36,7 +39,7 @@ export function RsvpButtons({
               role="radio"
               aria-checked={selected}
               disabled={!allowed[status] || rsvp.isPending}
-              onClick={() => !selected && rsvp.mutate({ eventId, status })}
+              onClick={() => !selected && rsvp.mutate({ eventId, status, share: share ?? undefined })}
               className={cx(
                 "rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed",
                 selected

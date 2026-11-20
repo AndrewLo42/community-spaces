@@ -248,8 +248,15 @@ export function canRsvp(
   event: { cancelled: boolean; ended: boolean; capacity: number | null; goingCount: number },
   current: RsvpStatus | null,
   next: RsvpStatus,
+  /**
+   * Someone outside the group who may come as a guest: they opened a shared
+   * link, the group is public, or they already RSVP'd. Never someone banned.
+   */
+  asGuest = false,
 ): boolean {
-  if (!activeRole(ctx) || event.cancelled || event.ended) return false;
+  if (!ctx.userId || event.cancelled || event.ended) return false;
+  const guestOk = asGuest && ctx.membership?.status !== "banned";
+  if (!activeRole(ctx) && !guestOk) return false;
   if (next !== "going" || current === "going" || event.capacity === null) return true;
   return event.goingCount < event.capacity;
 }

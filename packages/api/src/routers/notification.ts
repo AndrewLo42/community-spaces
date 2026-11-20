@@ -1,5 +1,5 @@
 import { markReadInput, markSeenInput, notificationListInput, updatePreferencesInput } from "@cs/core";
-import { and, count, desc, eq, events, groups, inArray, isNull, lt, notifications, posts, users } from "@cs/db";
+import { and, count, desc, eq, events, groups, inArray, isNull, lt, memberships, notifications, posts, users } from "@cs/db";
 import { protectedProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 30;
@@ -31,12 +31,15 @@ export const notificationRouter = router({
         groupSlug: groups.slug,
         groupName: groups.name,
         groupAccent: groups.accentColor,
+        groupVisibility: groups.visibility,
+        memberStatus: memberships.status,
       })
       .from(notifications)
       .leftJoin(users, eq(users.id, notifications.actorId))
       .leftJoin(posts, eq(posts.id, notifications.postId))
       .leftJoin(events, eq(events.id, notifications.eventId))
       .leftJoin(groups, eq(groups.id, notifications.groupId))
+      .leftJoin(memberships, and(eq(memberships.groupId, notifications.groupId), eq(memberships.userId, ctx.user.id)))
       .where(
         and(
           eq(notifications.userId, ctx.user.id),
@@ -46,11 +49,16 @@ export const notificationRouter = router({
       .orderBy(desc(notifications.updatedAt))
       .limit(PAGE_SIZE + 1);
 
-    const page = rows.slice(0, PAGE_SIZE).map(({ actorIds, ...n }) => ({
-      ...n,
-      actorCount: actorIds.length,
-      postSnippet: n.postBody ? n.postBody.slice(0, 120) : n.eventTitle,
-    }));
+    const page = rows.slice(0, PAGE_SIZE).map(({ actorIds, groupVisibility, memberStatus, ...n }) => {
+      // Guests of a secret group's event hear about the event, not the group or who's in it.
+      const secretGuest = groupVisibility === "hidden" && memberStatus !== "active";
+      return {
+        ...n,
+        ...(secretGuest ? { groupName: "A private group", groupSlug: null, actorName: null } : {}),
+        actorCount: actorIds.length,
+        postSnippet: n.postBody ? n.postBody.slice(0, 120) : n.eventTitle,
+      };
+    });
     const last = page[page.length - 1];
     return { notifications: page, nextCursor: rows.length > PAGE_SIZE && last ? last.updatedAt.toISOString() : null };
   }),

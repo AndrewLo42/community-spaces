@@ -269,6 +269,8 @@ export const listEventsInput = z.object({
 export const rsvpInput = z.object({
   eventId: z.string().min(1),
   status: z.enum(RSVP_STATUSES),
+  /** The event's share code, for someone outside a private group RSVPing from a shared link. */
+  share: z.string().max(64).optional(),
 });
 
 // ─── Announcements ───────────────────────────────────────────────────────────

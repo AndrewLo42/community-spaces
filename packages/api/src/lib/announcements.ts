@@ -1,5 +1,5 @@
 import { can, canMessageAttendees, eventEnd, type AnnouncementAudience } from "@cs/core";
-import { and, announcements, eq, eventRsvps, events, groups, inArray, memberships, ne, users, type Db } from "@cs/db";
+import { and, announcements, eq, eventRsvps, events, groups, inArray, isNull, memberships, ne, or, users, type Db } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { loadGroupAccess } from "./access";
 
@@ -25,7 +25,8 @@ export async function loadAudience(db: Db, audience: AnnouncementAudience, userI
 
 /**
  * Everyone an announcement reaches, minus its author: every active member for
- * a group announcement; active members who said going or maybe for an event.
+ * a group announcement; everyone who said going or maybe for an event, guests
+ * from outside the group included, but not anyone the group has banned.
  */
 export async function audienceIds(db: Db, audience: AnnouncementAudience, authorId: string) {
   const query =
@@ -34,11 +35,15 @@ export async function audienceIds(db: Db, audience: AnnouncementAudience, author
           .select({ userId: eventRsvps.userId })
           .from(eventRsvps)
           .innerJoin(events, eq(events.id, eventRsvps.eventId))
-          .innerJoin(
-            memberships,
-            and(eq(memberships.groupId, events.groupId), eq(memberships.userId, eventRsvps.userId), eq(memberships.status, "active")),
+          .leftJoin(memberships, and(eq(memberships.groupId, events.groupId), eq(memberships.userId, eventRsvps.userId)))
+          .where(
+            and(
+              eq(eventRsvps.eventId, audience.eventId),
+              inArray(eventRsvps.status, ["going", "maybe"]),
+              ne(eventRsvps.userId, authorId),
+              or(isNull(memberships.status), ne(memberships.status, "banned")),
+            ),
           )
-          .where(and(eq(eventRsvps.eventId, audience.eventId), inArray(eventRsvps.status, ["going", "maybe"]), ne(eventRsvps.userId, authorId)))
       : db
           .select({ userId: memberships.userId })
           .from(memberships)
@@ -46,20 +51,35 @@ export async function audienceIds(db: Db, audience: AnnouncementAudience, author
   return (await query).map((r) => r.userId);
 }
 
-/** Of these people, the ones who still want this group's announcement and reminder emails. */
+/**
+ * Of these people, the ones who still want this group's announcement and
+ * reminder emails. Guests (RSVP'd from outside the group) have no setting to
+ * turn off; they stop hearing about an event by changing their RSVP.
+ */
 export async function emailRecipients(db: Db, userIds: string[], groupId: string) {
   if (userIds.length === 0) return [];
-  return db
-    .select({ id: users.id, email: users.email, name: users.name })
+  const rows = await db
+    .select({ id: users.id, email: users.email, name: users.name, memberStatus: memberships.status, wantsEmails: memberships.announcementEmails })
     .from(users)
-    .innerJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.groupId, groupId)))
-    .where(and(inArray(users.id, userIds), eq(memberships.announcementEmails, true)));
+    .leftJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.groupId, groupId)))
+    .where(inArray(users.id, userIds));
+  return rows
+    .map(({ memberStatus, wantsEmails, ...r }) => ({ ...r, guest: memberStatus !== "active", wantsEmails }))
+    .filter((r) => (r.guest ? true : r.wantsEmails === true))
+    .map(({ wantsEmails: _, ...r }) => r);
 }
 
 /** What the host needs to email an announcement: the message, where it's from, and who still wants emails. */
 export async function announcementEmail(db: Db, announcementId: string) {
   const [row] = await db
-    .select({ announcement: announcements, groupName: groups.name, groupSlug: groups.slug, eventTitle: events.title, authorName: users.name })
+    .select({
+      announcement: announcements,
+      groupName: groups.name,
+      groupSlug: groups.slug,
+      groupVisibility: groups.visibility,
+      eventTitle: events.title,
+      authorName: users.name,
+    })
     .from(announcements)
     .innerJoin(groups, eq(groups.id, announcements.groupId))
     .leftJoin(events, eq(events.id, announcements.eventId))
@@ -81,6 +101,7 @@ export async function announcementEmail(db: Db, announcementId: string) {
     groupId: announcement.groupId,
     groupName: row.groupName,
     groupSlug: row.groupSlug,
+    groupVisibility: row.groupVisibility,
     eventId: announcement.eventId,
     eventTitle: row.eventTitle,
     authorName: row.authorName,

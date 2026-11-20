@@ -15,7 +15,7 @@ import {
   type PermissionContext,
   type RsvpStatus,
 } from "@cs/core";
-import { and, asc, desc, eq, eventRsvps, events, inArray, sql, users, type Db } from "@cs/db";
+import { and, asc, desc, eq, eventRsvps, events, inArray, memberships, sql, users, type Db } from "@cs/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess, requireGroupAction } from "../lib/access";
@@ -27,7 +27,7 @@ type EventRow = typeof events.$inferSelect;
 /** Over = past its end time, or three hours after it started if it has none. */
 
 /** What the UI needs for one event, including what this viewer can do with it. */
-function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | null, now = new Date()) {
+function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | null, asGuest = false, now = new Date()) {
   const ended = eventEnd(event) <= now;
   const cancelled = event.cancelledAt !== null;
   const state = { cancelled, ended, capacity: event.capacity, goingCount: event.goingCount };
@@ -55,7 +55,7 @@ function toEventView(event: EventRow, pc: PermissionContext, rsvp: RsvpStatus | 
       // Same rule as the thread loader in lib/threads: an event discussion is an open, published thread.
       canComment: canCommentOnPost(pc, { locked: false }),
       /** Which RSVP buttons work right now. */
-      canRsvp: Object.fromEntries(RSVP_STATUSES.map((s) => [s, canRsvp(pc, state, rsvp, s)])) as Record<RsvpStatus, boolean>,
+      canRsvp: Object.fromEntries(RSVP_STATUSES.map((s) => [s, canRsvp(pc, state, rsvp, s, asGuest)])) as Record<RsvpStatus, boolean>,
     },
   };
 }
@@ -71,20 +71,35 @@ async function viewerRsvps(db: Db, eventIds: string[], userId: string | null) {
 }
 
 /**
- * Loads an event with its group's access context, or throws NOT_FOUND if the
- * viewer can't read the group. A matching share code lets someone outside a
- * private or secret group see that one event as a guest (never someone the
- * group banned). Only byId takes a share code; everything else is for members.
+ * Loads an event with its group's access context, or throws NOT_FOUND.
+ *
+ * Members (and anyone, for public groups) read it as usual. Someone outside a
+ * private or secret group sees it as a guest if they hold the event's share
+ * code or already said they're going or maybe. Banned members never do.
+ * `canGuestRsvp` is whether someone who isn't a member may RSVP: guests, and
+ * anyone at a public group's event.
  */
 async function loadEventAccess(db: Db, eventId: string, userId: string | null, shareCode?: string) {
   const [event] = await db.select().from(events).where(eq(events.id, eventId));
   const access = event ? await loadGroupAccess(db, { id: event.groupId }, userId) : null;
   if (!event || !access) throw new TRPCError({ code: "NOT_FOUND" });
-  if (can(access.permissionContext, "group:read")) return { event, ...access, guest: false };
-  const shared =
-    shareCode !== undefined && event.shareCode !== null && shareCode === event.shareCode && access.membership?.status !== "banned";
-  if (!shared) throw new TRPCError({ code: "NOT_FOUND" });
-  return { event, ...access, guest: true };
+  const status = access.membership?.status;
+  const outsider = status !== "active" && status !== "banned";
+  if (can(access.permissionContext, "group:read")) {
+    return { event, ...access, guest: false, canGuestRsvp: outsider && access.group.visibility === "public" };
+  }
+  if (status === "banned") throw new TRPCError({ code: "NOT_FOUND" });
+  const shared = shareCode !== undefined && event.shareCode !== null && shareCode === event.shareCode;
+  if (!shared && !(userId && (await isComing(db, event.id, userId)))) throw new TRPCError({ code: "NOT_FOUND" });
+  return { event, ...access, guest: true, canGuestRsvp: true };
+}
+
+async function isComing(db: Db, eventId: string, userId: string) {
+  const [row] = await db
+    .select({ status: eventRsvps.status })
+    .from(eventRsvps)
+    .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId), inArray(eventRsvps.status, ["going", "maybe"])));
+  return row !== undefined;
 }
 
 /** Who may turn link sharing on: whoever manages the event, in groups that aren't already public. */
@@ -119,7 +134,7 @@ export const eventRouter = router({
   /** One event with its group, organizer and who's coming. */
   byId: publicProcedure.input(z.object({ eventId: z.string(), share: z.string().max(64).optional() })).query(async ({ ctx, input }) => {
     const userId = ctx.user?.id ?? null;
-    const { event, group, permissionContext, guest } = await loadEventAccess(ctx.db, input.eventId, userId, input.share);
+    const { event, group, permissionContext, guest, canGuestRsvp } = await loadEventAccess(ctx.db, input.eventId, userId, input.share);
     // A guest of a secret group learns about this event, not who's in the group.
     const secretGuest = guest && group.visibility === "hidden";
 
@@ -130,17 +145,22 @@ export const eventRouter = router({
     // Event links get shared beyond the group, so who's coming is for members
     // and fellow attendees; everyone else sees only the counts.
     const attendeesVisible = !guest && (permissionContext.membership?.status === "active" || rsvp === "going" || rsvp === "maybe");
-    const view = toEventView(event, permissionContext, rsvp);
-    const locationHidden = guest && !event.shareLocation && (event.location !== "" || event.link !== "");
+    const view = toEventView(event, permissionContext, rsvp, canGuestRsvp);
+    const coming = rsvp === "going" || rsvp === "maybe";
+    // Guests who said they're coming get the address even when the shared page hides it.
+    const locationHidden = guest && !coming && !event.shareLocation && (event.location !== "" || event.link !== "");
     const attendees = attendeesVisible
       ? await ctx.db
-          .select({ id: users.id, name: users.name, image: users.image, status: eventRsvps.status })
+          .select({ id: users.id, name: users.name, image: users.image, status: eventRsvps.status, memberStatus: memberships.status })
           .from(eventRsvps)
           .innerJoin(users, eq(users.id, eventRsvps.userId))
+          .leftJoin(memberships, and(eq(memberships.groupId, event.groupId), eq(memberships.userId, eventRsvps.userId)))
           .where(and(eq(eventRsvps.eventId, event.id), inArray(eventRsvps.status, ["going", "maybe"])))
           .orderBy(asc(eventRsvps.createdAt))
           .limit(500)
       : [];
+    /** Attendees who aren't members are labeled guests for the people who can see the list. */
+    const people = attendees.map(({ memberStatus, ...a }) => ({ ...a, guest: memberStatus !== "active" }));
 
     return {
       ...view,
@@ -161,8 +181,8 @@ export const eventRouter = router({
             },
       organizer: organizer ?? null,
       attendeesVisible,
-      going: attendees.filter((a) => a.status === "going"),
-      maybe: attendees.filter((a) => a.status === "maybe"),
+      going: people.filter((a) => a.status === "going"),
+      maybe: people.filter((a) => a.status === "maybe"),
     };
   }),
 
@@ -224,7 +244,7 @@ export const eventRouter = router({
     }),
 
   rsvp: protectedProcedure.input(rsvpInput).mutation(async ({ ctx, input }) => {
-    const access = await loadEventAccess(ctx.db, input.eventId, ctx.user.id);
+    const access = await loadEventAccess(ctx.db, input.eventId, ctx.user.id, input.share);
 
     return ctx.db.transaction(async (tx) => {
       // Lock the event so two people can't take the last spot at once.
@@ -240,8 +260,9 @@ export const eventRouter = router({
         capacity: event!.capacity,
         goingCount: event!.goingCount,
       };
-      if (!canRsvp(access.permissionContext, state, before, input.status)) {
-        const full = input.status === "going" && !state.cancelled && !state.ended && access.membership?.status === "active";
+      if (!canRsvp(access.permissionContext, state, before, input.status, access.canGuestRsvp)) {
+        const full =
+          input.status === "going" && !state.cancelled && !state.ended && (access.membership?.status === "active" || access.canGuestRsvp);
         throw new TRPCError({
           code: full ? "CONFLICT" : "FORBIDDEN",
           message: full ? "This event is full" : state.cancelled ? "This event was cancelled" : state.ended ? "This event is over" : "Join the group to RSVP",

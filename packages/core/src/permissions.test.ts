@@ -303,6 +303,15 @@ describe("events", () => {
     assert.equal(canRsvp(member, full, null, "maybe"), true);
     assert.equal(canRsvp(member, full, "going", "going"), true);
   });
+
+  it("guests RSVP like members, but not when signed out or banned", () => {
+    const open = { cancelled: false, ended: false, capacity: 2, goingCount: 1 };
+    assert.equal(canRsvp(ctx({}, null), open, null, "going", true), true);
+    assert.equal(canRsvp(ctx({}, null, null), open, null, "going", true), false);
+    assert.equal(canRsvp(ctx({}, { role: "member", status: "banned" }), open, null, "going", true), false);
+    assert.equal(canRsvp(ctx({}, null), { ...open, goingCount: 2 }, null, "going", true), false);
+    assert.equal(canRsvp(ctx({}, null), { ...open, cancelled: true }, null, "maybe", true), false);
+  });
 });
 
 describe("announcements", () => {

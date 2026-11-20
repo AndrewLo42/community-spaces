@@ -11,6 +11,7 @@ import { MarkSeen } from "@/components/mark-seen";
 import { NewPollButton } from "@/components/new-poll-button";
 import { PollList } from "@/components/poll-card";
 import { EventSharing } from "@/components/event-sharing";
+import { GuestRsvpForm } from "@/components/guest-rsvp-form";
 import { RsvpButtons } from "@/components/rsvp-buttons";
 import { ShareEventButton } from "@/components/share-event-button";
 import { ButtonLink, Card, cx } from "@/components/ui";
@@ -48,8 +49,11 @@ function mapHref(location: string) {
 
 export default async function EventPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { id } = await params;
-  const [event, user] = await Promise.all([loadEvent(id, shareParam(await searchParams)), getSessionUser()]);
-  if (event.guest) return <GuestEventPage event={event} signedIn={user !== null} />;
+  const query = await searchParams;
+  const share = shareParam(query);
+  const [event, user] = await Promise.all([loadEvent(id, share), getSessionUser()]);
+  const rsvpResult = typeof query.rsvp === "string" ? query.rsvp : null;
+  if (event.guest) return <GuestEventPage event={event} signedIn={user !== null} share={share ?? null} rsvpResult={rsvpResult} />;
   const api = await serverApi();
   const [comments, updates, polls] = await Promise.all([
     api.comment.list({ eventId: id }),
@@ -72,6 +76,8 @@ export default async function EventPage({ params, searchParams }: { params: Para
           This event was cancelled.
         </p>
       ) : null}
+
+      <RsvpResult result={rsvpResult} />
 
       <AnnouncementList title="Updates from the organizer" items={updates} viewerId={user?.id ?? null} />
 
@@ -158,9 +164,7 @@ export default async function EventPage({ params, searchParams }: { params: Para
             {event.ended ? null : canAnswer || event.viewer.rsvp ? (
               <RsvpButtons eventId={event.id} current={event.viewer.rsvp} allowed={event.viewer.canRsvp} />
             ) : !user ? (
-              <ButtonLink href={`/sign-in?next=${encodeURIComponent(`/e/${event.id}`)}`} variant="secondary">
-                Sign in to RSVP
-              </ButtonLink>
+              <GuestRsvpForm eventId={event.id} share={null} full={event.spotsLeft === 0} devHint={!process.env.RESEND_API_KEY} />
             ) : (
               <p className="text-sm text-muted">
                 <Link href={`/g/${groupSlug}`} className="text-accent hover:underline">
@@ -194,7 +198,7 @@ export default async function EventPage({ params, searchParams }: { params: Para
           {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
         </>
       ) : event.goingCount + event.maybeCount > 0 ? (
-        <p className="text-sm text-muted">Members of {event.group.name} can see who's coming.</p>
+        <p className="text-sm text-muted">Members of {event.group.name} and people coming can see who's coming.</p>
       ) : null}
 
       {user ? <MarkSeen eventId={event.id} /> : null}
@@ -203,7 +207,7 @@ export default async function EventPage({ params, searchParams }: { params: Para
   );
 }
 
-function PeopleList({ title, people }: { title: string; people: { id: string; name: string; image: string | null }[] }) {
+function PeopleList({ title, people }: { title: string; people: { id: string; name: string; image: string | null; guest: boolean }[] }) {
   if (people.length === 0) return null;
   return (
     <section className="space-y-3">
@@ -215,6 +219,7 @@ function PeopleList({ title, people }: { title: string; people: { id: string; na
           <li key={p.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm">
             <Avatar name={p.name} image={p.image} size="sm" />
             <span className="truncate">{p.name}</span>
+            {p.guest ? <span className="ml-auto shrink-0 rounded bg-line/60 px-1.5 py-0.5 text-xs text-muted">Guest</span> : null}
           </li>
         ))}
       </ul>
@@ -228,7 +233,17 @@ type EventDetails = Awaited<ReturnType<typeof loadEvent>>;
  * What someone outside a private or secret group sees through a shared link:
  * the event itself, without the group's updates, polls, comments or who's coming.
  */
-function GuestEventPage({ event, signedIn }: { event: EventDetails; signedIn: boolean }) {
+function GuestEventPage({
+  event,
+  signedIn,
+  share,
+  rsvpResult,
+}: {
+  event: EventDetails;
+  signedIn: boolean;
+  share: string | null;
+  rsvpResult: string | null;
+}) {
   const map = mapHref(event.location);
   const when = formatEventWhen(event);
   const query = guestQuery(event);
@@ -238,6 +253,8 @@ function GuestEventPage({ event, signedIn }: { event: EventDetails; signedIn: bo
       <p className="text-sm text-muted">
         Shared with you{event.group.slug ? <> from <span className="font-medium text-fg">{event.group.name}</span></> : " from a private group"}
       </p>
+
+      <RsvpResult result={rsvpResult} />
 
       {event.cancelled ? (
         <p role="status" className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -272,7 +289,7 @@ function GuestEventPage({ event, signedIn }: { event: EventDetails; signedIn: bo
           {event.locationHidden ? (
             <div className="flex gap-3">
               <dt className="w-14 shrink-0 text-muted">Where</dt>
-              <dd className="text-muted">The organizer shares where it is with group members.</dd>
+              <dd className="text-muted">The organizer shares where it is with people who are coming.</dd>
             </div>
           ) : null}
           {event.location ? (
@@ -324,23 +341,44 @@ function GuestEventPage({ event, signedIn }: { event: EventDetails; signedIn: bo
               <h2 className="font-semibold">{event.ended ? "This event is over" : "Want to come?"}</h2>
               <p className="text-sm text-muted">{attendanceSummary(event)}</p>
             </div>
-            {event.ended ? null : (
-              <p className="text-sm text-muted">
-                Only members of {event.group.slug ? event.group.name : "the group"} can RSVP for now. Ask whoever sent you this link
-                {event.group.slug ? (
-                  <>
-                    , or{" "}
-                    <Link href={signedIn ? `/g/${event.group.slug}` : `/sign-in?next=${encodeURIComponent(`/g/${event.group.slug}`)}`} className="text-accent hover:underline">
-                      see the group
-                    </Link>
-                  </>
-                ) : null}
-                .
-              </p>
+            {event.ended ? null : signedIn ? (
+              Object.values(event.viewer.canRsvp).some(Boolean) || event.viewer.rsvp ? (
+                <RsvpButtons eventId={event.id} share={share} current={event.viewer.rsvp} allowed={event.viewer.canRsvp} />
+              ) : null
+            ) : (
+              <GuestRsvpForm eventId={event.id} share={share} full={event.spotsLeft === 0} devHint={!process.env.RESEND_API_KEY} />
             )}
+            {event.viewer.rsvp === "going" || event.viewer.rsvp === "maybe" ? (
+              <p className="text-xs text-muted">
+                You'll get a reminder the day before, and any updates from the organizer. Changing to “Can't go” stops them.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Card>
     </div>
+  );
+}
+
+/** What happened after a guest's confirm link brought them back here. */
+function RsvpResult({ result }: { result: string | null }) {
+  const messages: Record<string, { text: string; ok: boolean }> = {
+    going: { text: "You're going. See you there!", ok: true },
+    maybe: { text: "You're down as a maybe.", ok: true },
+    full: { text: "Sorry, the event filled up before you confirmed. You can still say maybe.", ok: false },
+    failed: { text: "We couldn't save your RSVP. Try again below.", ok: false },
+  };
+  const m = result ? messages[result] : undefined;
+  if (!m) return null;
+  return (
+    <p
+      role="status"
+      className={cx(
+        "rounded-lg border px-4 py-3 text-sm",
+        m.ok ? "border-accent/40 bg-accent/10 text-fg" : "border-danger/40 bg-danger/10 text-danger",
+      )}
+    >
+      {m.text}
+    </p>
   );
 }
