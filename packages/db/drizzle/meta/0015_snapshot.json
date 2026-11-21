@@ -1,5 +1,5 @@
 {
-  "id": "ed2843fa-5624-4a64-8973-76060d065967",
+  "id": "30eaf02d-bd0a-461c-9ca9-78bc2597783e",
   "prevId": "d459c620-c7a3-4bb3-828f-0dc18e5ca874",
   "version": "7",
   "dialect": "postgresql",
@@ -642,19 +642,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "share_code": {
-          "name": "share_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "share_location": {
-          "name": "share_location",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "reminded_at": {
           "name": "reminded_at",
           "type": "timestamp with time zone",
@@ -744,15 +731,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "events_share_code_unique": {
-          "name": "events_share_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "share_code"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -851,6 +830,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'members'"
+        },
+        "invite_policy": {
+          "name": "invite_policy",
+          "type": "invite_policy",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'admins'"
         },
         "member_count": {
           "name": "member_count",
@@ -2793,6 +2780,14 @@
         "public",
         "private",
         "hidden"
+      ]
+    },
+    "public.invite_policy": {
+      "name": "invite_policy",
+      "schema": "public",
+      "values": [
+        "admins",
+        "members"
       ]
     },
     "public.join_policy": {

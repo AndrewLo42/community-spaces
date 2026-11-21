@@ -3,6 +3,7 @@ import {
   type CommentPolicy,
   type EventPolicy,
   type GroupVisibility,
+  type InvitePolicy,
   type JoinPolicy,
   type MemberRole,
   type MembershipStatus,
@@ -21,6 +22,7 @@ export interface GroupRules {
   postPolicy: PostPolicy;
   commentPolicy: CommentPolicy;
   eventPolicy: EventPolicy;
+  invitePolicy: InvitePolicy;
 }
 
 export interface MembershipState {
@@ -52,7 +54,8 @@ export type GroupAction =
   | "member:review" // approve / reject join requests
   | "member:ban"
   | "report:review"
-  | "invite:manage"
+  | "invite:create" // make an invite link of your own
+  | "invite:manage" // see and revoke every link
   | "group:announce" // message every member at once
   | "group:manage"; // can open the manage page at all
 
@@ -118,6 +121,9 @@ export function can(ctx: PermissionContext, action: GroupAction): boolean {
     case "report:review":
     case "group:manage":
       return isAtLeast(role, "moderator");
+
+    case "invite:create":
+      return group.invitePolicy === "members" ? isMember : isAtLeast(role, "admin");
 
     case "invite:manage":
     case "group:announce":
@@ -292,6 +298,7 @@ export function groupPermissions(ctx: PermissionContext) {
     createEvent: can(ctx, "event:create"),
     moderate: can(ctx, "post:moderate"),
     manage: can(ctx, "group:manage"),
+    invite: can(ctx, "invite:create"),
     manageInvites: can(ctx, "invite:manage"),
     announce: can(ctx, "group:announce"),
   };

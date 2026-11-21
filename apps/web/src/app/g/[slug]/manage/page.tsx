@@ -121,6 +121,7 @@ export default async function ManagePage({
                 postPolicy: group.postPolicy,
                 commentPolicy: group.commentPolicy,
                 eventPolicy: group.eventPolicy,
+                invitePolicy: group.invitePolicy,
                 placeId: group.place?.id ?? null,
               }}
               initialPlace={group.place}

@@ -3,6 +3,7 @@ import {
   COMMENT_STATUSES,
   EMAIL_DIGEST_OPTIONS,
   EVENT_POLICIES,
+  INVITE_POLICIES,
   GROUP_VISIBILITIES,
   JOIN_POLICIES,
   MEMBER_ROLES,
@@ -168,6 +169,7 @@ export const joinPolicy = pgEnum("join_policy", JOIN_POLICIES);
 export const postPolicy = pgEnum("post_policy", POST_POLICIES);
 export const commentPolicy = pgEnum("comment_policy", COMMENT_POLICIES);
 export const eventPolicy = pgEnum("event_policy", EVENT_POLICIES);
+export const invitePolicy = pgEnum("invite_policy", INVITE_POLICIES);
 export const postStatus = pgEnum("post_status", POST_STATUSES);
 export const commentStatus = pgEnum("comment_status", COMMENT_STATUSES);
 export const reportTarget = pgEnum("report_target", REPORT_TARGETS);
@@ -190,6 +192,7 @@ export const groups = pgTable(
     postPolicy: postPolicy("post_policy").notNull().default("members"),
     commentPolicy: commentPolicy("comment_policy").notNull().default("members"),
     eventPolicy: eventPolicy("event_policy").notNull().default("members"),
+    invitePolicy: invitePolicy("invite_policy").notNull().default("admins"),
     // Denormalized so discovery and group headers never COUNT(*).
     memberCount: integer("member_count").notNull().default(0),
     createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),

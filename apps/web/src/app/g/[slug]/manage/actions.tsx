@@ -228,7 +228,7 @@ export function InvitePanel({ groupId, invites }: { groupId: string; invites: In
       <Card className="space-y-4 p-4">
         <p className="text-sm text-muted">
           Anyone with an invite link can join, whatever the group's join setting. It's the only way into invite-only and
-          hidden groups.
+          secret groups. A link stops working if the person who made it leaves the group or can no longer invite.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Expires">
@@ -339,7 +339,13 @@ export function SettingsForm({
         update.mutate({ ...form, groupId });
       }}
     >
-      <GroupSettingsFields value={form} onChange={setForm} errors={errors} initialPlace={initialPlace} />
+      <GroupSettingsFields
+        value={form}
+        onChange={setForm}
+        errors={errors}
+        initialPlace={initialPlace}
+        savedVisibility={initial.visibility}
+      />
       <div className="flex items-center justify-end gap-3">
         {update.isSuccess && !update.isPending ? <span className="text-sm text-muted">Saved</span> : null}
         {update.error ? <span className="text-sm text-danger">{errorMessage(update.error)}</span> : null}
