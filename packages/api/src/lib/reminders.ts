@@ -41,7 +41,7 @@ export async function sendReminder(db: Db, eventId: string, now: Date) {
     .returning();
   if (!event) return null;
 
-  const [group] = await db.select({ name: groups.name }).from(groups).where(eq(groups.id, event.groupId));
+  const [group] = await db.select({ name: groups.name, visibility: groups.visibility }).from(groups).where(eq(groups.id, event.groupId));
   const when = formatEventWhen(event, now);
   // Nobody is left out as the author: the organizer needs the reminder too.
   const attendees = await audienceIds(db, { eventId }, "");
@@ -62,6 +62,7 @@ export async function sendReminder(db: Db, eventId: string, now: Date) {
     location: event.location,
     groupId: event.groupId,
     groupName: group?.name ?? "",
+    groupVisibility: group?.visibility ?? "hidden",
     recipients: await emailRecipients(db, attendees, event.groupId),
   };
 }

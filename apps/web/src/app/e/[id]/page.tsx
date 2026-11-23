@@ -10,17 +10,35 @@ import { EventActions } from "@/components/event-actions";
 import { MarkSeen } from "@/components/mark-seen";
 import { NewPollButton } from "@/components/new-poll-button";
 import { PollList } from "@/components/poll-card";
+import { EventSharing } from "@/components/event-sharing";
+import { GuestRsvpForm } from "@/components/guest-rsvp-form";
 import { RsvpButtons } from "@/components/rsvp-buttons";
+import { ShareEventButton } from "@/components/share-event-button";
 import { ButtonLink, Card, cx } from "@/components/ui";
 import { serverApi } from "@/server/api";
 import { getSessionUser } from "@/server/auth";
-import { loadEvent } from "./load-event";
+import { loadEvent, shareParam } from "./load-event";
 
 type Params = Promise<{ id: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const event = await loadEvent((await params).id);
-  return { title: event.title, description: `${formatEventWhen(event)} · ${event.group.name}` };
+/** `?s=code` on the event's own links, for guests who came in through a shared link. */
+function guestQuery(event: { guest: boolean; sharing: { code: string | null } | null }) {
+  return event.guest && event.sharing?.code ? `?s=${event.sharing.code}` : "";
+}
+
+export async function generateMetadata({ params, searchParams }: { params: Params; searchParams: SearchParams }): Promise<Metadata> {
+  const event = await loadEvent((await params).id, shareParam(await searchParams));
+  const description = [formatEventWhen(event), event.location, event.group.name].filter(Boolean).join(" · ");
+  const image = { url: `/e/${event.id}/og${guestQuery(event)}`, width: 1200, height: 630, alt: event.title };
+  return {
+    title: event.title,
+    description,
+    openGraph: { type: "website", title: event.title, description, siteName: "Community Spaces", images: [image] },
+    twitter: { card: "summary_large_image", title: event.title, description, images: [image] },
+    // Members-only events don't belong in search results even if a link leaks.
+    ...(event.group.visibility === "public" ? {} : { robots: { index: false, follow: false } }),
+  };
 }
 
 /** A map search for free-text places; "Online" and friends aren't on a map. */
@@ -29,21 +47,27 @@ function mapHref(location: string) {
   return `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query: location })}`;
 }
 
-export default async function EventPage({ params }: { params: Params }) {
+export default async function EventPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { id } = await params;
-  const [event, user] = await Promise.all([loadEvent(id), getSessionUser()]);
+  const query = await searchParams;
+  const share = shareParam(query);
+  const [event, user] = await Promise.all([loadEvent(id, share), getSessionUser()]);
+  const rsvpResult = typeof query.rsvp === "string" ? query.rsvp : null;
+  if (event.guest) return <GuestEventPage event={event} signedIn={user !== null} share={share ?? null} rsvpResult={rsvpResult} />;
   const api = await serverApi();
   const [comments, updates, polls] = await Promise.all([
     api.comment.list({ eventId: id }),
     api.announcement.forEvent({ eventId: id }),
     api.poll.list({ eventId: id }),
   ]);
+  const groupSlug = event.group.slug!;
   const map = mapHref(event.location);
   const canAnswer = Object.values(event.viewer.canRsvp).some(Boolean);
+  const when = formatEventWhen(event);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link href={`/g/${event.group.slug}/events`} className="text-sm text-muted hover:text-fg">
+      <Link href={`/g/${groupSlug}/events`} className="text-sm text-muted hover:text-fg">
         ← {event.group.name} events
       </Link>
 
@@ -52,6 +76,8 @@ export default async function EventPage({ params }: { params: Params }) {
           This event was cancelled.
         </p>
       ) : null}
+
+      <RsvpResult result={rsvpResult} />
 
       <AnnouncementList title="Updates from the organizer" items={updates} viewerId={user?.id ?? null} />
 
@@ -63,7 +89,7 @@ export default async function EventPage({ params }: { params: Params }) {
               {event.title}
             </h1>
             <p className="text-sm text-muted">
-              <Link href={`/g/${event.group.slug}`} className="hover:text-fg hover:underline">
+              <Link href={`/g/${groupSlug}`} className="hover:text-fg hover:underline">
                 {event.group.name}
               </Link>
               {event.organizer ? <> · Planned by {event.organizer.name}</> : null}
@@ -74,7 +100,7 @@ export default async function EventPage({ params }: { params: Params }) {
         <dl className="space-y-2 text-sm">
           <div className="flex gap-3">
             <dt className="w-14 shrink-0 text-muted">When</dt>
-            <dd>{formatEventWhen(event)}</dd>
+            <dd>{when}</dd>
           </div>
           {event.location ? (
             <div className="flex gap-3">
@@ -105,16 +131,30 @@ export default async function EventPage({ params }: { params: Params }) {
         {event.description ? <p className="whitespace-pre-line text-sm leading-relaxed">{event.description}</p> : null}
 
         {!event.cancelled && !event.ended ? (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="text-muted">Add to calendar:</span>
-            <a href={`/e/${event.id}/calendar?to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-              Google
-            </a>
-            {/* An .ics file, which Apple Calendar, Outlook and most others open. */}
-            <a href={`/e/${event.id}/calendar`} className="text-accent hover:underline">
-              Apple, Outlook and others
-            </a>
-          </p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <ShareEventButton key={event.sharing?.code ?? "members"} eventId={event.id} shareCode={event.sharing?.code ?? null} title={event.title} when={when} />
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-muted">Add to calendar:</span>
+                <a href={`/e/${event.id}/calendar?to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  Google
+                </a>
+                {/* An .ics file, which Apple Calendar, Outlook and most others open. */}
+                <a href={`/e/${event.id}/calendar`} className="text-accent hover:underline">
+                  Apple, Outlook and others
+                </a>
+              </span>
+            </div>
+            {event.sharing ? (
+              <p className="text-xs text-muted">
+                {event.sharing.code
+                  ? "Anyone with the link can see this event, but not the rest of the group."
+                  : event.sharing.canChange
+                    ? `Only members of ${event.group.name} can open this link. To invite others, create an invite link below.`
+                    : `Only members of ${event.group.name} can open this link.`}
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         {!event.cancelled ? (
@@ -126,12 +166,10 @@ export default async function EventPage({ params }: { params: Params }) {
             {event.ended ? null : canAnswer || event.viewer.rsvp ? (
               <RsvpButtons eventId={event.id} current={event.viewer.rsvp} allowed={event.viewer.canRsvp} />
             ) : !user ? (
-              <ButtonLink href={`/sign-in?next=${encodeURIComponent(`/e/${event.id}`)}`} variant="secondary">
-                Sign in to RSVP
-              </ButtonLink>
+              <GuestRsvpForm eventId={event.id} share={null} full={event.spotsLeft === 0} devHint={!process.env.RESEND_API_KEY} />
             ) : (
               <p className="text-sm text-muted">
-                <Link href={`/g/${event.group.slug}`} className="text-accent hover:underline">
+                <Link href={`/g/${groupSlug}`} className="text-accent hover:underline">
                   Join {event.group.name}
                 </Link>{" "}
                 to RSVP.
@@ -140,12 +178,21 @@ export default async function EventPage({ params }: { params: Params }) {
           </div>
         ) : null}
 
-        {event.viewer.canManage || event.viewer.canMessage ? (
+        {event.viewer.canManage || event.viewer.canMessage || event.sharing?.canChange ? (
           <div className="flex flex-wrap gap-2 border-t border-line pt-5">
             {event.viewer.canMessage ? (
               <AnnounceButton audience={{ eventId: event.id }} label="Message everyone coming" variant="primary" />
             ) : null}
             {event.viewer.canMessage && !event.cancelled ? <NewPollButton audience={{ eventId: event.id }} label="Start a poll" /> : null}
+            {event.sharing?.canChange && !event.cancelled ? (
+              <EventSharing
+                eventId={event.id}
+                code={event.sharing.code}
+                showLocation={event.sharing.showLocation}
+                groupName={event.group.name}
+                groupVisibility={event.group.visibility}
+              />
+            ) : null}
             {event.viewer.canManage ? <EventActions eventId={event.id} title={event.title} goingCount={event.goingCount} /> : null}
           </div>
         ) : null}
@@ -153,8 +200,14 @@ export default async function EventPage({ params }: { params: Params }) {
 
       <PollList title="Polls" polls={polls} />
 
-      <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
-      {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
+      {event.attendeesVisible ? (
+        <>
+          <PeopleList title={event.ended ? "Went" : "Going"} people={event.going} />
+          {!event.ended ? <PeopleList title="Maybe" people={event.maybe} /> : null}
+        </>
+      ) : event.goingCount + event.maybeCount > 0 ? (
+        <p className="text-sm text-muted">Members of {event.group.name} and people coming can see who's coming.</p>
+      ) : null}
 
       {user ? <MarkSeen eventId={event.id} /> : null}
       <CommentThread thread={{ eventId: event.id }} comments={comments} canComment={event.viewer.canComment} />
@@ -162,7 +215,7 @@ export default async function EventPage({ params }: { params: Params }) {
   );
 }
 
-function PeopleList({ title, people }: { title: string; people: { id: string; name: string; image: string | null }[] }) {
+function PeopleList({ title, people }: { title: string; people: { id: string; name: string; image: string | null; guest: boolean }[] }) {
   if (people.length === 0) return null;
   return (
     <section className="space-y-3">
@@ -174,9 +227,166 @@ function PeopleList({ title, people }: { title: string; people: { id: string; na
           <li key={p.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm">
             <Avatar name={p.name} image={p.image} size="sm" />
             <span className="truncate">{p.name}</span>
+            {p.guest ? <span className="ml-auto shrink-0 rounded bg-line/60 px-1.5 py-0.5 text-xs text-muted">Guest</span> : null}
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+type EventDetails = Awaited<ReturnType<typeof loadEvent>>;
+
+/**
+ * What someone outside a private or secret group sees through a shared link:
+ * the event itself, without the group's updates, polls, comments or who's coming.
+ */
+function GuestEventPage({
+  event,
+  signedIn,
+  share,
+  rsvpResult,
+}: {
+  event: EventDetails;
+  signedIn: boolean;
+  share: string | null;
+  rsvpResult: string | null;
+}) {
+  const map = mapHref(event.location);
+  const when = formatEventWhen(event);
+  const query = guestQuery(event);
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <p className="text-sm text-muted">
+        Shared with you{event.group.slug ? <> from <span className="font-medium text-fg">{event.group.name}</span></> : " from a private group"}
+      </p>
+
+      <RsvpResult result={rsvpResult} />
+
+      {event.cancelled ? (
+        <p role="status" className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+          This event was cancelled.
+        </p>
+      ) : null}
+
+      <Card className="space-y-5 p-5 sm:p-6">
+        <div className="flex gap-4">
+          <EventDateBadge event={event} muted={event.cancelled || event.ended} />
+          <div className="min-w-0 space-y-1">
+            <h1 className={cx("font-serif text-2xl font-semibold tracking-tight sm:text-3xl", event.cancelled && "line-through decoration-muted")}>
+              {event.title}
+            </h1>
+            {/* A secret group's guests already read "from a private group" above; nothing more to say here. */}
+            {event.group.slug ? (
+              <p className="text-sm text-muted">
+                <Link href={`/g/${event.group.slug}`} className="hover:text-fg hover:underline">
+                  {event.group.name}
+                </Link>
+                {event.organizer ? <> · Planned by {event.organizer.name}</> : null}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <dl className="space-y-2 text-sm">
+          <div className="flex gap-3">
+            <dt className="w-14 shrink-0 text-muted">When</dt>
+            <dd>{when}</dd>
+          </div>
+          {event.locationHidden ? (
+            <div className="flex gap-3">
+              <dt className="w-14 shrink-0 text-muted">Where</dt>
+              <dd className="text-muted">The organizer shares where it is with people who are coming.</dd>
+            </div>
+          ) : null}
+          {event.location ? (
+            <div className="flex gap-3">
+              <dt className="w-14 shrink-0 text-muted">Where</dt>
+              <dd>
+                {map ? (
+                  <a href={map} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                    {event.location}
+                  </a>
+                ) : (
+                  event.location
+                )}
+              </dd>
+            </div>
+          ) : null}
+          {event.link ? (
+            <div className="flex gap-3">
+              <dt className="w-14 shrink-0 text-muted">Link</dt>
+              <dd className="min-w-0 truncate">
+                <a href={event.link} target="_blank" rel="noreferrer nofollow" className="text-accent hover:underline">
+                  {event.link.replace(/^https?:\/\//, "")}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+
+        {event.description ? <p className="whitespace-pre-line text-sm leading-relaxed">{event.description}</p> : null}
+
+        {!event.cancelled && !event.ended ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <ShareEventButton key={event.sharing?.code ?? "members"} eventId={event.id} shareCode={event.sharing?.code ?? null} title={event.title} when={when} />
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-muted">Add to calendar:</span>
+              <a href={`/e/${event.id}/calendar${query}${query ? "&" : "?"}to=google`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                Google
+              </a>
+              <a href={`/e/${event.id}/calendar${query}`} className="text-accent hover:underline">
+                Apple, Outlook and others
+              </a>
+            </span>
+          </div>
+        ) : null}
+
+        {!event.cancelled ? (
+          <div className="space-y-2 border-t border-line pt-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-semibold">{event.ended ? "This event is over" : event.viewer.rsvp ? "Your RSVP" : "Want to come?"}</h2>
+              <p className="text-sm text-muted">{attendanceSummary(event)}</p>
+            </div>
+            {event.ended ? null : signedIn ? (
+              Object.values(event.viewer.canRsvp).some(Boolean) || event.viewer.rsvp ? (
+                <RsvpButtons eventId={event.id} share={share} current={event.viewer.rsvp} allowed={event.viewer.canRsvp} />
+              ) : null
+            ) : (
+              <GuestRsvpForm eventId={event.id} share={share} full={event.spotsLeft === 0} devHint={!process.env.RESEND_API_KEY} />
+            )}
+            {event.viewer.rsvp === "going" || event.viewer.rsvp === "maybe" ? (
+              <p className="text-xs text-muted">
+                You'll get a reminder the day before, and any updates from the organizer. Changing to “Can't go” stops them.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </Card>
+    </div>
+  );
+}
+
+/** What happened after a guest's confirm link brought them back here. */
+function RsvpResult({ result }: { result: string | null }) {
+  const messages: Record<string, { text: string; ok: boolean }> = {
+    going: { text: "You're going. See you there!", ok: true },
+    maybe: { text: "You're down as a maybe.", ok: true },
+    full: { text: "Sorry, the event filled up before you confirmed. You can still say maybe.", ok: false },
+    failed: { text: "We couldn't save your RSVP. Try again below.", ok: false },
+  };
+  const m = result ? messages[result] : undefined;
+  if (!m) return null;
+  return (
+    <p
+      role="status"
+      className={cx(
+        "rounded-lg border px-4 py-3 text-sm",
+        m.ok ? "border-accent/40 bg-accent/10 text-fg" : "border-danger/40 bg-danger/10 text-danger",
+      )}
+    >
+      {m.text}
+    </p>
   );
 }

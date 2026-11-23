@@ -28,11 +28,15 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       async sendMagicLink({ email, url }) {
+        // Guests RSVPing from an event page get a link that confirms their answer (see rsvp-link.ts).
+        const callback = new URL(url).searchParams.get("callbackURL") ?? "";
+        const rsvp = /^\/e\/[^/]+\/rsvp\?/.test(callback);
+        const action = rsvp ? "Confirm your RSVP" : "Sign in to Community Spaces";
         await sendEmail({
           to: email,
-          subject: "Your Community Spaces sign-in link",
-          text: `Sign in to Community Spaces: ${url}\n\nThis link expires in 5 minutes.`,
-          html: `<p><a href="${url}">Sign in to Community Spaces</a></p><p>This link expires in 5 minutes.</p>`,
+          subject: rsvp ? "Confirm your RSVP" : "Your Community Spaces sign-in link",
+          text: `${action}: ${url}\n\nThis link expires in 5 minutes.${rsvp ? " It also signs you in to Community Spaces." : ""}`,
+          html: `<p><a href="${url}">${action}</a></p><p>This link expires in 5 minutes.${rsvp ? " It also signs you in to Community Spaces." : ""}</p>`,
         });
       },
     }),

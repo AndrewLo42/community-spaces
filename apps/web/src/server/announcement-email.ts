@@ -12,12 +12,15 @@ function baseUrl() {
   return (process.env.BETTER_AUTH_URL || `http://localhost:${process.env.PORT ?? 3000}`).replace(/\/$/, "");
 }
 
-function render(a: AnnouncementEmail, recipient: { id: string; name: string }, base: string) {
-  const where = a.eventTitle ? `${a.eventTitle} (${a.groupName})` : a.groupName;
+function render(a: AnnouncementEmail, recipient: { id: string; name: string; guest: boolean }, base: string) {
+  // Guests came for one event: a secret group's guests don't learn its name or who's in it.
+  const secret = recipient.guest && a.groupVisibility === "hidden";
+  const groupName = secret ? "a private group" : a.groupName;
+  const where = a.eventTitle ? `${a.eventTitle} (${groupName})` : groupName;
   const href = `${base}${a.eventId ? `/e/${a.eventId}` : `/g/${a.groupSlug}`}`;
   const stop = unsubscribeUrl(base, { userId: recipient.id, groupId: a.groupId });
-  const from = a.authorName ? `${a.authorName} in ${where}` : where;
-  const subject = `${a.eventTitle ? `Update: ${a.eventTitle}` : a.groupName} · ${messageSnippet(a.body, 60)}`;
+  const from = a.authorName && !secret ? `${a.authorName} in ${where}` : `The organizer of ${where}`;
+  const subject = `${a.eventTitle ? `Update: ${a.eventTitle}` : groupName} · ${messageSnippet(a.body, 60)}`;
 
   const text = [
     `${from}:`,
@@ -26,7 +29,7 @@ function render(a: AnnouncementEmail, recipient: { id: string; name: string }, b
     "",
     `Open it: ${href}`,
     "",
-    `Stop announcement and reminder emails from ${a.groupName}: ${stop}`,
+    recipient.guest ? `You're getting this because you RSVP'd. To stop, change your RSVP to "Can't go": ${href}` : `Stop announcement and reminder emails from ${a.groupName}: ${stop}`,
   ].join("\n");
 
   const html = [
@@ -34,9 +37,11 @@ function render(a: AnnouncementEmail, recipient: { id: string; name: string }, b
     `<p style="color:#646b66;font-size:14px">${escape(from)}</p>`,
     `<div style="border-left:3px solid #2f6f5e;padding:4px 0 4px 14px;white-space:pre-line">${escape(a.body)}</div>`,
     `<p><a href="${href}" style="color:#2f6f5e">Open in Community Spaces</a></p>`,
-    `<p style="color:#646b66;font-size:12px;margin-top:32px">You're getting this because you're ${
-      a.eventTitle ? `going to ${escape(a.eventTitle)}` : `a member of ${escape(a.groupName)}`
-    }. <a href="${stop}" style="color:#646b66">Stop announcement and reminder emails from ${escape(a.groupName)}</a>.</p>`,
+    recipient.guest
+      ? `<p style="color:#646b66;font-size:12px;margin-top:32px">You're getting this because you RSVP'd to ${escape(a.eventTitle ?? "this event")}. To stop, <a href="${href}" style="color:#646b66">change your RSVP to “Can't go”</a>.</p>`
+      : `<p style="color:#646b66;font-size:12px;margin-top:32px">You're getting this because you're ${
+          a.eventTitle ? `going to ${escape(a.eventTitle)}` : `a member of ${escape(a.groupName)}`
+        }. <a href="${stop}" style="color:#646b66">Stop announcement and reminder emails from ${escape(a.groupName)}</a>.</p>`,
     `</div>`,
   ].join("");
 
@@ -53,10 +58,13 @@ export async function sendAnnouncementEmails(announcementId: string) {
       await sendEmail({
         to: recipient.email,
         ...render(announcement, recipient, base),
-        headers: {
-          "List-Unsubscribe": `<${oneClickUnsubscribeUrl(base, { userId: recipient.id, groupId: announcement.groupId })}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
+        // Guests have no email setting to turn off; their footer says how to stop instead.
+        headers: recipient.guest
+          ? undefined
+          : {
+              "List-Unsubscribe": `<${oneClickUnsubscribeUrl(base, { userId: recipient.id, groupId: announcement.groupId })}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
       });
     } catch (error) {
       console.error(`announcement ${announcementId} to ${recipient.id} failed:`, error);
