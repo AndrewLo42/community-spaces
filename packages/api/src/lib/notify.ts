@@ -1,5 +1,5 @@
-import type { NotificationType } from "@cs/core";
-import { and, eq, inArray, memberships, notifications, sql, type Db } from "@cs/db";
+import { notificationSettingFor, type NotificationType } from "@cs/core";
+import { and, eq, inArray, memberships, notifications, sql, users, type Db } from "@cs/db";
 
 export interface NotificationEvent {
   type: NotificationType;
@@ -21,10 +21,22 @@ export interface NotificationEvent {
  * so it can't undo the comment or approval that caused it.
  */
 export async function notify(db: Db, recipientIds: string[], event: NotificationEvent): Promise<void> {
-  const recipients = [...new Set(recipientIds)].filter((id) => id !== event.actorId);
+  let recipients = [...new Set(recipientIds)].filter((id) => id !== event.actorId);
   if (recipients.length === 0) return;
 
   try {
+    // Leave out anyone who turned this kind off.
+    const setting = notificationSettingFor(event.type);
+    if (setting) {
+      const muted = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(inArray(users.id, recipients), sql`${setting} = any(${users.mutedNotifications})`));
+      const mutedIds = new Set(muted.map((m) => m.id));
+      recipients = recipients.filter((id) => !mutedIds.has(id));
+      if (recipients.length === 0) return;
+    }
+
     await db
       .insert(notifications)
       .values(

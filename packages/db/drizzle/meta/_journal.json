@@ -120,6 +120,13 @@
       "when": 1795220118189,
       "tag": "0016_event_share",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795462021150,
+      "tag": "0017_event_notices",
+      "breakpoints": true
     }
   ]
 }

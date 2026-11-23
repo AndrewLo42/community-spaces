@@ -95,6 +95,8 @@ export const users = pgTable("users", {
   bio: text("bio").notNull().default(""),
   /** Opt-in: nobody gets summary emails until they choose daily or weekly. */
   emailDigest: emailDigest("email_digest").notNull().default("off"),
+  /** Notification settings (keys of NOTIFICATION_SETTINGS) this person turned off in the app. */
+  mutedNotifications: text("muted_notifications").array().notNull().default(sql`'{}'::text[]`),
   /** When this user's digest window last closed (sent, or checked with nothing to say). */
   lastDigestAt: timestamp("last_digest_at", { withTimezone: true }),
   ...timestamps,

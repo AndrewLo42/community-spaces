@@ -19,8 +19,10 @@ import { and, asc, desc, eq, eventRsvps, events, inArray, memberships, sql, user
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess, requireGroupAction } from "../lib/access";
+import { noticeEventChange, whatChanged, type EventChange } from "../lib/event-changes";
+import { notify } from "../lib/notify";
 import { endsAtOrDefault, upcomingEvents } from "../lib/upcoming";
-import { protectedProcedure, publicProcedure, router } from "../trpc";
+import { protectedProcedure, publicProcedure, router, type Mailer } from "../trpc";
 
 type EventRow = typeof events.$inferSelect;
 
@@ -214,10 +216,16 @@ export const eventRouter = router({
     }
     // Lowering capacity never bumps anyone; it only stops new "going" answers.
     const moved = fields.startsAt.getTime() !== event.startsAt.getTime();
-    await ctx.db
+    const [updated] = await ctx.db
       .update(events)
       .set({ ...fields, ...(moved ? { remindedAt: null } : {}) })
-      .where(eq(events.id, eventId));
+      .where(eq(events.id, eventId))
+      .returning();
+    // A new time or place is news for everyone coming; a reworded description isn't.
+    const changed = whatChanged(event, updated!);
+    if (changed && eventEnd(updated!) > new Date()) {
+      await tellAttendees(ctx, updated!, { kind: "changed", changed });
+    }
     return { id: eventId };
   }),
 
@@ -225,7 +233,10 @@ export const eventRouter = router({
   cancel: protectedProcedure.input(z.object({ eventId: z.string() })).mutation(async ({ ctx, input }) => {
     const { event, permissionContext } = await loadEventAccess(ctx.db, input.eventId, ctx.user.id);
     if (!canManageEvent(permissionContext, event)) throw new TRPCError({ code: "FORBIDDEN" });
-    if (!event.cancelledAt) await ctx.db.update(events).set({ cancelledAt: new Date() }).where(eq(events.id, event.id));
+    if (!event.cancelledAt) {
+      const [cancelled] = await ctx.db.update(events).set({ cancelledAt: new Date() }).where(eq(events.id, event.id)).returning();
+      if (eventEnd(cancelled!) > new Date()) await tellAttendees(ctx, cancelled!, { kind: "cancelled" });
+    }
     return { id: event.id };
   }),
 
@@ -246,7 +257,7 @@ export const eventRouter = router({
   rsvp: protectedProcedure.input(rsvpInput).mutation(async ({ ctx, input }) => {
     const access = await loadEventAccess(ctx.db, input.eventId, ctx.user.id, input.share);
 
-    return ctx.db.transaction(async (tx) => {
+    const result = await ctx.db.transaction(async (tx) => {
       // Lock the event so two people can't take the last spot at once.
       const [event] = await tx.select().from(events).where(eq(events.id, input.eventId)).for("update");
       const [current] = await tx
@@ -268,7 +279,7 @@ export const eventRouter = router({
           message: full ? "This event is full" : state.cancelled ? "This event was cancelled" : state.ended ? "This event is over" : "Join the group to RSVP",
         });
       }
-      if (before === input.status) return { status: before };
+      if (before === input.status) return { status: before, before };
 
       await tx
         .insert(eventRsvps)
@@ -282,8 +293,24 @@ export const eventRouter = router({
           maybeCount: sql`${events.maybeCount} + ${delta("maybe")}`,
         })
         .where(eq(events.id, input.eventId));
-      return { status: input.status };
+      return { status: input.status, before };
     });
+
+    // The organizer hears when someone new is coming (one notice per event, gathering names while unread).
+    const joining =
+      result.status !== result.before &&
+      (result.status === "going" || (result.status === "maybe" && result.before !== "going"));
+    if (joining && access.event.createdById) {
+      await notify(ctx.db, [access.event.createdById], {
+        type: "event_rsvp",
+        groupKey: `event_rsvp:${access.event.id}`,
+        groupId: access.event.groupId,
+        eventId: access.event.id,
+        actorId: ctx.user.id,
+        data: { title: access.event.title },
+      });
+    }
+    return { status: result.status };
   }),
 
   /** The next few events in a group, for the sidebar on its posts tab. */
@@ -302,3 +329,13 @@ export const eventRouter = router({
   /** What's coming up across the viewer's groups, for the home page. */
   upcoming: protectedProcedure.query(({ ctx }) => upcomingEvents(ctx.db, ctx.user.id, { now: new Date(), limit: 5 })),
 });
+
+/** In-app notices now; emails after the response, like announcements. */
+async function tellAttendees(ctx: { db: Db; mailer?: Mailer; after?: (task: () => Promise<void>) => void; user: { id: string } }, event: EventRow, change: EventChange) {
+  const email = await noticeEventChange(ctx.db, event, change, ctx.user.id);
+  const { mailer } = ctx;
+  if (!email || !mailer || email.recipients.length === 0) return;
+  const send = () => mailer.sendEventChange(email).catch((e) => console.error(`event ${event.id} change email failed:`, e));
+  if (ctx.after) ctx.after(send);
+  else void send();
+}

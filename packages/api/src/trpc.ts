@@ -1,3 +1,4 @@
+import type { EventChangeEmail } from "./lib/event-changes";
 import type { Db } from "@cs/db";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
@@ -14,6 +15,8 @@ export interface SessionUser {
 /** Emails the API asks the host app to send; the host owns templates, links and the mail provider. */
 export interface Mailer {
   sendAnnouncement(announcementId: string): Promise<void>;
+  /** Tells people coming that an event moved or was cancelled. */
+  sendEventChange(change: EventChangeEmail): Promise<void>;
 }
 
 /** Built per request by the host app (Next.js today, the same server for mobile later). */

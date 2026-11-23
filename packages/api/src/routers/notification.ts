@@ -1,10 +1,40 @@
-import { markReadInput, markSeenInput, notificationListInput, updatePreferencesInput } from "@cs/core";
-import { and, count, desc, eq, events, groups, inArray, isNull, lt, memberships, notifications, posts, users } from "@cs/db";
+import {
+  markReadInput,
+  markSeenInput,
+  notificationListInput,
+  notificationSettingInput,
+  updatePreferencesInput,
+  type NotificationFilter,
+  type NotificationType,
+} from "@cs/core";
+import { and, count, desc, eq, events, groups, inArray, isNotNull, isNull, lt, memberships, notifications, notInArray, posts, sql, users } from "@cs/db";
 import { protectedProcedure, router } from "../trpc";
 
 const PAGE_SIZE = 30;
 
 const unreadOf = (userId: string) => and(eq(notifications.userId, userId), isNull(notifications.readAt));
+
+const POST_TYPES: NotificationType[] = ["comment", "reply", "post_approved", "post_declined"];
+
+/**
+ * The notifications page's tabs. Events: anything about an event. Posts: your
+ * posts and comments. Groups: the rest (memberships, roles, review queues, and
+ * group-wide announcements and polls).
+ */
+function filterWhere(filter: NotificationFilter) {
+  switch (filter) {
+    case "all":
+      return undefined;
+    case "unread":
+      return isNull(notifications.readAt);
+    case "events":
+      return isNotNull(notifications.eventId);
+    case "posts":
+      return and(isNull(notifications.eventId), inArray(notifications.type, POST_TYPES));
+    case "groups":
+      return and(isNull(notifications.eventId), notInArray(notifications.type, POST_TYPES));
+  }
+}
 
 export const notificationRouter = router({
   unreadCount: protectedProcedure.query(async ({ ctx }) => {
@@ -43,6 +73,7 @@ export const notificationRouter = router({
       .where(
         and(
           eq(notifications.userId, ctx.user.id),
+          filterWhere(input.filter),
           before && !Number.isNaN(before.getTime()) ? lt(notifications.updatedAt, before) : undefined,
         ),
       )
@@ -94,10 +125,23 @@ export const notificationRouter = router({
 
   preferences: protectedProcedure.query(async ({ ctx }) => {
     const [row] = await ctx.db
-      .select({ emailDigest: users.emailDigest })
+      .select({ emailDigest: users.emailDigest, muted: users.mutedNotifications })
       .from(users)
       .where(eq(users.id, ctx.user.id));
-    return { emailDigest: row?.emailDigest ?? "off" };
+    return { emailDigest: row?.emailDigest ?? "off", mutedNotifications: row?.muted ?? [] };
+  }),
+
+  /** Turns one kind of in-app notification on or off. */
+  setNotificationSetting: protectedProcedure.input(notificationSettingInput).mutation(async ({ ctx, input }) => {
+    await ctx.db
+      .update(users)
+      .set({
+        mutedNotifications: input.enabled
+          ? sql`array_remove(${users.mutedNotifications}, ${input.setting})`
+          : sql`case when ${input.setting} = any(${users.mutedNotifications}) then ${users.mutedNotifications} else array_append(${users.mutedNotifications}, ${input.setting}) end`,
+      })
+      .where(eq(users.id, ctx.user.id));
+    return { ok: true };
   }),
 
   updatePreferences: protectedProcedure.input(updatePreferencesInput).mutation(async ({ ctx, input }) => {

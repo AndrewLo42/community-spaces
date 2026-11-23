@@ -34,7 +34,7 @@ export function EventActions({ eventId, title, goingCount }: { eventId: string; 
         <Dialog title="Cancel this event?" onClose={() => setConfirming(false)}>
           <p className="text-sm text-muted">
             “{title}” stays on the calendar marked as cancelled
-            {goingCount > 1 ? `, so the ${goingCount} people who said they're going can see it's off` : ""}. This can't be undone.
+            {goingCount > 1 ? `. Everyone who said they're going or maybe gets a notification and an email` : ""}. This can't be undone.
           </p>
           {cancel.error ? <p className="mt-3 text-sm text-danger">{errorMessage(cancel.error)}</p> : null}
           <div className="mt-5 flex justify-end gap-2">

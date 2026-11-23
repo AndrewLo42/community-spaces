@@ -56,6 +56,17 @@ export function describeNotification(n: NotificationSummary): string {
     case "event_reminder":
       // The time rather than "tomorrow", so it still reads right whenever it's opened.
       return `Coming up: ${n.data?.title ?? "an event"}, ${n.data?.when ?? "soon"}`;
+    case "event_changed": {
+      const title = n.data?.title ?? "An event you're going to";
+      // Each change replaces the last while unread, so this always shows the latest details.
+      if (n.data?.changed === "time") return `New time for ${title}: ${n.data.when}`;
+      if (n.data?.changed === "place") return `New place for ${title}: ${n.data.place || "see the event"}`;
+      return `${title} changed: ${[n.data?.when, n.data?.place].filter(Boolean).join(" · ")}`;
+    }
+    case "event_cancelled":
+      return `Cancelled: ${n.data?.title ?? "an event you were going to"}${n.data?.when ? `, ${n.data.when}` : ""}`;
+    case "event_rsvp":
+      return `${actors(n)} RSVP'd to ${n.data?.title ?? "your event"}`;
   }
 }
 
@@ -65,6 +76,9 @@ export function notificationHref(n: Pick<NotificationSummary, "type" | "postId" 
     case "comment":
     case "event_comment":
     case "event_reminder":
+    case "event_changed":
+    case "event_cancelled":
+    case "event_rsvp":
     case "reply":
     case "post_approved":
       return n.postId ? `/p/${n.postId}` : n.eventId ? `/e/${n.eventId}` : "/";
