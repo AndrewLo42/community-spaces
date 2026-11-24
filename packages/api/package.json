@@ -7,7 +7,8 @@
     "./storage": "./src/storage.ts",
     "./digest": "./src/lib/digest.ts",
     "./announcements": "./src/lib/announcements.ts",
-    "./reminders": "./src/lib/reminders.ts"
+    "./reminders": "./src/lib/reminders.ts",
+    "./event-changes": "./src/lib/event-changes.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

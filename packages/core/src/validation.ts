@@ -17,6 +17,9 @@ import {
   MAX_IMAGE_BYTES,
   MAX_POST_IMAGES,
   MEMBER_ROLES,
+  NOTIFICATION_FILTERS,
+  NOTIFICATION_SETTING_KEYS,
+  type NotificationSetting,
   POST_POLICIES,
   REPORT_REASONS,
   REPORT_TARGETS,
@@ -208,7 +211,14 @@ export const inviteCodeInput = z.object({ code: z.string().trim().min(1).max(64)
 
 // ─── Notifications ───────────────────────────────────────────────────────────
 
-export const notificationListInput = z.object({ cursor: z.string().max(200).optional() });
+export const notificationListInput = z.object({
+  cursor: z.string().max(200).optional(),
+  filter: z.enum(NOTIFICATION_FILTERS).default("all"),
+});
+export const notificationSettingInput = z.object({
+  setting: z.enum(NOTIFICATION_SETTING_KEYS as [NotificationSetting, ...NotificationSetting[]]),
+  enabled: z.boolean(),
+});
 export const markSeenInput = z.union([
   z.object({ postId: z.string().min(1) }),
   z.object({ eventId: z.string().min(1) }),

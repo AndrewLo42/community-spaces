@@ -6,6 +6,7 @@ import { getSessionUser } from "@/server/auth";
 import { AvatarField } from "./avatar-field";
 import { AnnouncementEmailsForm } from "./announcement-emails-form";
 import { DigestForm } from "./digest-form";
+import { NotificationSettingsForm } from "./notification-settings-form";
 import { ProfileForm } from "./profile-form";
 
 export const metadata: Metadata = { title: "Profile" };
@@ -37,6 +38,9 @@ export default async function ProfilePage() {
       </div>
       <div className="mt-8">
         <AnnouncementEmailsForm initial={announcementEmails} />
+      </div>
+      <div id="notifications" className="mt-8 scroll-mt-20">
+        <NotificationSettingsForm muted={prefs.mutedNotifications} />
       </div>
       <div className="mt-10 border-t border-line pt-6">
         <SignOutButton />

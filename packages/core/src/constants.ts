@@ -95,8 +95,36 @@ export const NOTIFICATION_TYPES = [
   "announcement", // from a group's admins, or an event's organizer to its attendees
   "poll", // a new poll for you to answer
   "event_reminder", // an event you said you'd come to is coming up
+  "event_changed", // an event you're coming to has a new time or place
+  "event_cancelled", // an event you're coming to was called off
+  "event_rsvp", // organizers: people said they're coming
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Notification kinds people can turn off in the app. Everything else (event
+ * changes and cancellations, reminders, announcements, role changes, review
+ * queues) always comes through, because missing it causes real trouble.
+ */
+export const NOTIFICATION_SETTINGS = {
+  rsvps: { label: "RSVPs to your events", description: "When someone says they're going or might come.", types: ["event_rsvp"] },
+  comments: { label: "Comments and replies", description: "On your posts and events, and replies to your comments.", types: ["comment", "event_comment", "reply"] },
+  polls: { label: "New polls", description: "When a group or an event you're coming to starts a poll.", types: ["poll"] },
+} as const satisfies Record<string, { label: string; description: string; types: readonly NotificationType[] }>;
+export type NotificationSetting = keyof typeof NOTIFICATION_SETTINGS;
+export const NOTIFICATION_SETTING_KEYS = Object.keys(NOTIFICATION_SETTINGS) as NotificationSetting[];
+
+/** The setting that turns this kind off, if it can be. */
+export function notificationSettingFor(type: NotificationType): NotificationSetting | null {
+  for (const key of NOTIFICATION_SETTING_KEYS) {
+    if ((NOTIFICATION_SETTINGS[key].types as readonly NotificationType[]).includes(type)) return key;
+  }
+  return null;
+}
+
+/** Tabs on the notifications page. */
+export const NOTIFICATION_FILTERS = ["all", "unread", "events", "posts", "groups"] as const;
+export type NotificationFilter = (typeof NOTIFICATION_FILTERS)[number];
 
 /** Announcements notify and email everyone, so each group or event gets a few a day at most. */
 export const MAX_ANNOUNCEMENTS_PER_DAY = 3;

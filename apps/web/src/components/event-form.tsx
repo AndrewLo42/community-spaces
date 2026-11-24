@@ -121,6 +121,10 @@ export function EventForm(
 
       {mutation.error ? <p className="text-sm text-danger">{errorMessage(mutation.error)}</p> : null}
 
+      {props.mode === "edit" ? (
+        <p className="text-xs text-muted">If you change the time or place, everyone who said they're coming gets a notification and an email.</p>
+      ) : null}
+
       <div className="flex justify-end gap-2">
         <ButtonLink href={props.cancelHref} variant="ghost">
           Cancel
