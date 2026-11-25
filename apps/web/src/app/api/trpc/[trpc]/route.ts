@@ -20,4 +20,8 @@ const handler = (req: Request) =>
     },
   });
 
+// Room for work that runs after the response: an event's change email waits
+// a couple of minutes for more edits before it goes out.
+export const maxDuration = 300;
+
 export { handler as GET, handler as POST };

@@ -1,9 +1,12 @@
+import { overdueChangeEmails, sendHeldChangeEmail } from "@cs/api/event-changes";
 import { dueReminders, sendReminder } from "@cs/api/reminders";
 import { db } from "@/server/db";
+import { sendEventChangeEmails } from "@/server/event-change-email";
 import { sendReminderEmails } from "@/server/reminder-email";
 
 // Runs once a day (apps/web/vercel.json). Each event is reminded once; moving
-// it clears that, so the next run tells people the new time.
+// it clears that, so the next run tells people the new time. It also sends any
+// change email whose couple-of-minute wait was cut short by the server stopping.
 
 const BATCH = 20;
 const TIME_BUDGET_MS = 45_000; // stay inside the serverless function limit
@@ -42,5 +45,19 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ events, emails, failed });
+  let changes = 0;
+  for (const eventId of await overdueChangeEmails(db, now)) {
+    try {
+      const email = await sendHeldChangeEmail(db, eventId, undefined, now);
+      if (email && email.recipients.length > 0) {
+        await sendEventChangeEmails(email);
+        changes++;
+      }
+    } catch (error) {
+      failed++;
+      console.error(`change email for event ${eventId} failed:`, error);
+    }
+  }
+
+  return Response.json({ events, emails, changes, failed });
 }
