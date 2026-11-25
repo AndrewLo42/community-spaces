@@ -382,6 +382,26 @@ export const events = pgTable(
   ],
 );
 
+/**
+ * A change email waiting to go out. Edits close together share one row, which
+ * keeps the time and place from before the first of them, so attendees get one
+ * email about the net change (or none, if it was put back).
+ */
+export const eventChangeEmails = pgTable("event_change_emails", {
+  eventId: text("event_id")
+    .primaryKey()
+    .references(() => events.id, { onDelete: "cascade" }),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  location: text("location").notNull(),
+  link: text("link").notNull(),
+  /** Whoever made the latest edit; they don't get the email. */
+  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  /** Bumped by each edit, so only the send scheduled by the latest one goes out. */
+  version: integer("version").notNull().default(1),
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+});
+
 export const eventRsvps = pgTable(
   "event_rsvps",
   {

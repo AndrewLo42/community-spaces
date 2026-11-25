@@ -19,7 +19,16 @@ import { and, asc, desc, eq, eventRsvps, events, inArray, memberships, sql, user
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadGroupAccess, requireGroupAction } from "../lib/access";
-import { noticeEventChange, whatChanged, type EventChange } from "../lib/event-changes";
+import {
+  changeEmail,
+  changeEmailDelayMs,
+  dropHeldChangeEmail,
+  holdChangeEmail,
+  noticeEventChange,
+  sendHeldChangeEmail,
+  whatChanged,
+  type EventChange,
+} from "../lib/event-changes";
 import { notify } from "../lib/notify";
 import { endsAtOrDefault, upcomingEvents } from "../lib/upcoming";
 import { protectedProcedure, publicProcedure, router, type Mailer } from "../trpc";
@@ -224,7 +233,7 @@ export const eventRouter = router({
     // A new time or place is news for everyone coming; a reworded description isn't.
     const changed = whatChanged(event, updated!);
     if (changed && eventEnd(updated!) > new Date()) {
-      await tellAttendees(ctx, updated!, { kind: "changed", changed });
+      await tellAttendees(ctx, event, updated!, { kind: "changed", changed });
     }
     return { id: eventId };
   }),
@@ -235,7 +244,7 @@ export const eventRouter = router({
     if (!canManageEvent(permissionContext, event)) throw new TRPCError({ code: "FORBIDDEN" });
     if (!event.cancelledAt) {
       const [cancelled] = await ctx.db.update(events).set({ cancelledAt: new Date() }).where(eq(events.id, event.id)).returning();
-      if (eventEnd(cancelled!) > new Date()) await tellAttendees(ctx, cancelled!, { kind: "cancelled" });
+      if (eventEnd(cancelled!) > new Date()) await tellAttendees(ctx, event, cancelled!, { kind: "cancelled" });
     }
     return { id: event.id };
   }),
@@ -331,11 +340,37 @@ export const eventRouter = router({
 });
 
 /** In-app notices now; emails after the response, like announcements. */
-async function tellAttendees(ctx: { db: Db; mailer?: Mailer; after?: (task: () => Promise<void>) => void; user: { id: string } }, event: EventRow, change: EventChange) {
-  const email = await noticeEventChange(ctx.db, event, change, ctx.user.id);
-  const { mailer } = ctx;
-  if (!email || !mailer || email.recipients.length === 0) return;
-  const send = () => mailer.sendEventChange(email).catch((e) => console.error(`event ${event.id} change email failed:`, e));
-  if (ctx.after) ctx.after(send);
-  else void send();
+/**
+ * The in-app notice goes out now. A cancellation emails right away too; a new
+ * time or place waits a couple of minutes, so a few edits in a row become one
+ * email about where things ended up.
+ */
+async function tellAttendees(
+  ctx: { db: Db; mailer?: Mailer; after?: (task: () => Promise<void>) => void; user: { id: string } },
+  before: EventRow,
+  after: EventRow,
+  change: EventChange,
+) {
+  const told = await noticeEventChange(ctx.db, after, change, ctx.user.id);
+  const { mailer, db } = ctx;
+  if (!mailer) return;
+  let task: () => Promise<void>;
+  if (change.kind === "cancelled") {
+    await dropHeldChangeEmail(db, after.id);
+    if (told === 0) return;
+    const email = await changeEmail(db, after, change, ctx.user.id);
+    if (!email || email.recipients.length === 0) return;
+    task = () => mailer.sendEventChange(email);
+  } else {
+    if (told === 0) return;
+    const version = await holdChangeEmail(db, before, ctx.user.id);
+    task = async () => {
+      await new Promise((r) => setTimeout(r, changeEmailDelayMs()));
+      const email = await sendHeldChangeEmail(db, after.id, version);
+      if (email && email.recipients.length > 0) await mailer.sendEventChange(email);
+    };
+  }
+  const run = () => task().catch((e) => console.error(`event ${after.id} change email failed:`, e));
+  if (ctx.after) ctx.after(run);
+  else void run();
 }
